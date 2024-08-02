@@ -32,7 +32,9 @@ import (
 	"strings"
 
 	"github.com/peterh/liner"
+	//	expect "github.com/rcornwell/tinyTCL/expect"
 	tcl "github.com/rcornwell/tinyTCL/tcl"
+	file "github.com/rcornwell/tinyTCL/tclfile"
 )
 
 func main() {
@@ -41,6 +43,12 @@ func main() {
 	tinyTcl.SetVarValue("argv0", os.Args[0])
 	tinyTcl.SetVarValue("argc", "0")
 	tinyTcl.SetVarValue("argv", "")
+
+	// Add in file commands.
+	file.FileInit(tinyTcl)
+
+	// Add in expect commands.
+	// expect.ExcpectInit(tinyTcl)
 
 	// If any arguments given, try to open the first one as a TCL file.
 	if len(os.Args) > 2 {
@@ -63,6 +71,7 @@ func main() {
 	defer Line.Close()
 
 	Line.SetCtrlCAborts(true)
+
 	Line.SetMultiLineMode(true)
 
 outer:

@@ -51,6 +51,7 @@ type Tcl struct {
 	level  int                // Current nesting level.
 	cmds   map[string]*tclCmd // Supported commands.
 	result string             // Result from last command.
+	Data   map[string]any     // Place for extensions to store data.
 }
 
 // Commands, function amd default arguments.
@@ -78,6 +79,7 @@ func NewTCL() *Tcl {
 	tcl := &Tcl{}
 	tcl.env = tcl.newEnv()
 	tcl.cmds = make(map[string]*tclCmd)
+	tcl.Data = make(map[string]any)
 	tcl.tclInitCommands()
 	return tcl
 }
