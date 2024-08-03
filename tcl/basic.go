@@ -47,7 +47,7 @@ func (tcl *Tcl) tclInitCommands() {
 	tcl.Register("exit", []string{"exit"}, false, cmdFlow)
 	tcl.Register("expr", str, false, cmdMath)
 	tcl.Register("for", str, false, cmdFor)
-	// tcl.Register("foreach", str, false,cmdForEach)
+	tcl.Register("foreach", str, false, cmdForEach)
 	tcl.Register("global", str, false, cmdGlobal)
 	tcl.Register("if", str, false, cmdIf)
 	tcl.Register("info", str, false, cmdInfo)
@@ -90,11 +90,14 @@ func cmdCatch(tcl *Tcl, args []string, _ []string) int {
 	if len(args) < 2 || len(args) > 3 {
 		return tcl.SetResult(RetError, "catch script ?varName")
 	}
-	_ = tcl.eval(args[1], parserOptions{})
+	ret := tcl.eval(args[1], parserOptions{})
 	if len(args) == 3 {
 		tcl.SetVarValue(args[2], tcl.result)
 	}
-	return RetOk
+	if ret != RetOk {
+		return tcl.SetResult(RetOk, "1")
+	}
+	return tcl.SetResult(RetOk, "0")
 }
 
 // Return Error condition.
@@ -144,7 +147,6 @@ func cmdSubstr(tcl *Tcl, args []string, _ []string) int {
 			done = true
 		}
 	}
-	fmt.Println("subst " + str)
 	return tcl.eval(str, opts)
 }
 
@@ -221,7 +223,6 @@ func cmdUpVar(tcl *Tcl, args []string, _ []string) int {
 		level = lvl
 	}
 
-	fmt.Printf("Up %t %d\n", top, level)
 	env := tcl.getLevel(top, level)
 	if env == nil {
 		return tcl.SetResult(RetError, "not valid level number")
@@ -230,11 +231,10 @@ func cmdUpVar(tcl *Tcl, args []string, _ []string) int {
 	// Get a variable at a envirorment.
 	for (v + 1) < len(args) {
 		variable, ok := env.vars[args[v]]
-		if !ok {
-			return tcl.SetResult(RetError, "variable "+args[v]+" not found")
+		if ok {
+			tcl.env.vars[args[v+1]] = variable
+			tcl.env.local[args[v+1]] = false
 		}
-		tcl.env.vars[args[v+1]] = variable
-		tcl.env.local[args[v+1]] = false
 		v += 2
 	}
 	return tcl.SetResult(RetOk, "")
@@ -281,7 +281,7 @@ func cmdVariable(tcl *Tcl, args []string, _ []string) int {
 
 // Rename a procedure.
 func cmdRename(tcl *Tcl, args []string, _ []string) int {
-	if len(args) < 1 || len(args) > 2 {
+	if len(args) < 2 || len(args) > 3 {
 		return tcl.SetResult(RetError, "rename OldName ?newName")
 	}
 	cmd, ok := tcl.cmds[args[1]]
@@ -289,7 +289,7 @@ func cmdRename(tcl *Tcl, args []string, _ []string) int {
 		return tcl.SetResult(RetError, "comand "+args[1]+" not found")
 	}
 	tcl.cmds[args[1]] = nil
-	if len(args) == 2 {
+	if len(args) == 3 {
 		tcl.cmds[args[2]] = cmd
 	}
 	return tcl.SetResult(RetOk, "")
@@ -305,7 +305,7 @@ var truthValue = map[string]bool{
 	"true":  true,
 }
 
-// Handle if {cond} {body} ?ifelse {cond} {body} ?else {body}.
+// Handle if {cond} {body} ?elseif {cond} {body} ?else {body}.
 func cmdIf(tcl *Tcl, args []string, _ []string) int {
 	i := 3
 	n := len(args)
@@ -316,16 +316,14 @@ func cmdIf(tcl *Tcl, args []string, _ []string) int {
 			i += 2
 			break
 		}
-		if args[i] == "ifelse" {
-			i += 2
+		if args[i] == "elseif" {
+			i += 3
 			continue
 		}
-		break
+		return tcl.SetResult(RetError, "if {} syntax error")
 	}
-	if i != n {
-		tcl.result = "if {} syntax"
-		return RetError
-	}
+
+	// Scan actual expression.
 	i = 1
 	for i < n {
 		cond := "expr " + args[i]
@@ -343,6 +341,7 @@ func cmdIf(tcl *Tcl, args []string, _ []string) int {
 			break
 		}
 		if args[i] == "elseif" {
+			i++
 			continue
 		}
 		if args[i] == "else" {

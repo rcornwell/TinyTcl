@@ -26,7 +26,6 @@
 package tcl
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 )
@@ -79,7 +78,6 @@ func stringCompare(tcl *Tcl, args []string) int {
 			nocase = true
 		} else if args[i] == "-length" {
 			i++
-			fmt.Println("Lens ", args[i])
 			l, _, ok := ConvertStringToNumber(args[i], 10, 0)
 			if !ok {
 				return tcl.SetResult(RetError, "count")
@@ -413,7 +411,7 @@ func stringRepeat(tcl *Tcl, args []string) int {
 	}
 	str := args[2]
 	count, _, ok := ConvertStringToNumber(args[3], 10, 0)
-	if ok {
+	if !ok {
 		return tcl.SetResult(RetError, "count invalid "+args[3])
 	}
 
@@ -518,28 +516,15 @@ func stringTrim(tcl *Tcl, args []string) int {
 	}
 
 	res := args[2]
-	start := 0
-	last := len(res) - 1
 	if args[1] != "trimright" {
-		for start < len(res) {
-			if !strings.ContainsAny(string(res[start]), match) {
-				break
-			}
-			start++
-		}
+		res = strings.TrimLeft(res, match)
 	}
 
 	if args[1] != "trimleft" {
-		for last >= 0 && last >= start {
-			if !strings.ContainsAny(string(res[last]), match) {
-				last++
-				break
-			}
-			last--
-		}
+		res = strings.TrimRight(res, match)
 	}
 
-	return tcl.SetResult(RetOk, res[start:last])
+	return tcl.SetResult(RetOk, res)
 }
 
 // Report on various information about the system.

@@ -26,7 +26,6 @@
 package tcl
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -175,7 +174,7 @@ func cmdLAppend(tcl *Tcl, args []string, _ []string) int {
 	name := args[1]
 	str := strings.Join(args[2:], " ")
 	ret, result := tcl.GetVarValue(name)
-	if ret == RetOk {
+	if ret == RetOk && result != "" {
 		str = result + " " + str
 	}
 
@@ -247,11 +246,14 @@ func (tcl *Tcl) order(integer bool, reverse bool, command, a, b string) (bool, i
 			return false, ret
 		}
 
-		v, tok := truthValue[tcl.result]
-		if !tok {
+		v, _, ok := ConvertStringToNumber(tcl.GetResult(), 10, 0)
+		if !ok {
 			return false, RetError
 		}
-		return reverse != v, RetOk
+		if reverse {
+			v = -1 * v
+		}
+		return v < 0, RetOk
 	}
 
 	// If not do integer or string compare
@@ -521,10 +523,70 @@ func cmdSplit(tcl *Tcl, args []string, _ []string) int {
 		}
 	}
 
-	fmt.Println(current)
 	// Append anything left over.
 	if current != "" {
 		result = append(result, current)
 	}
 	return cmdList(tcl, result, []string{})
+}
+
+// Foreach command.
+func cmdForEach(tcl *Tcl, args []string, _ []string) int {
+	type argList struct {
+		vars  []string // variables.
+		list  []string // Values of list.
+		index int      // Current index.
+	}
+
+	lists := []argList{}
+
+	if len(args) < 4 {
+		tcl.SetResult(RetError, "foreach var list body")
+	}
+
+	i := 1
+	// Convert arguments up until last one to a pair of var/list pairs.
+	for (i + 1) < len(args) {
+		v := tcl.ParseArgs(args[i])
+		l := tcl.ParseArgs(args[i+1])
+		lists = append(lists, argList{vars: v, list: l, index: 0})
+		i += 2
+	}
+	body := args[i]
+
+outer:
+	for {
+		done := true
+		// Loop over all lists.
+		for i := range lists {
+			// For each list pair, copy list elements to variables.
+			for _, v := range lists[i].vars {
+				ind := lists[i].index
+				if ind < len(lists[i].list) {
+					tcl.SetVarValue(v, lists[i].list[ind])
+					done = false
+					lists[i].index++
+				} else {
+					tcl.SetVarValue(v, "{}")
+				}
+			}
+		}
+
+		// If exhausted lists, done.
+		if done {
+			break
+		}
+
+		// Run body.
+		r := tcl.eval(body, parserOptions{})
+		switch r {
+		case RetOk, RetContinue:
+		case RetBreak:
+			break outer
+		default:
+			return tcl.SetResult(r, "")
+		}
+	}
+
+	return tcl.SetResult(RetOk, "")
 }

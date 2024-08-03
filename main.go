@@ -38,7 +38,7 @@ import (
 )
 
 func main() {
-	// Create new TCL enviorment.
+	// Create new TCL environment.
 	tinyTcl := tcl.NewTCL()
 	tinyTcl.SetVarValue("argv0", os.Args[0])
 	tinyTcl.SetVarValue("argc", "0")
@@ -67,11 +67,10 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
 	Line := liner.NewLiner()
 	defer Line.Close()
-
 	Line.SetCtrlCAborts(true)
-
 	Line.SetMultiLineMode(true)
 
 outer:
@@ -105,7 +104,6 @@ outer:
 		}
 
 		Line.AppendHistory(command)
-		fmt.Println(command)
 		err := tinyTcl.EvalString(command)
 		if err != nil {
 			if errors.Is(err, tcl.ErrExit) {
@@ -113,7 +111,7 @@ outer:
 			} else {
 				fmt.Println("Error: " + tinyTcl.GetResult())
 			}
-		} else {
+		} else if tinyTcl.GetResult() != "" {
 			fmt.Println("=> " + tinyTcl.GetResult())
 		}
 	}

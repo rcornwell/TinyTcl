@@ -118,7 +118,7 @@ func TestEval(t *testing.T) {
 		{"break", "", RetBreak},
 		{"set y {}; for {set x 0} {$x<10} {incr x} { if {$x > 5} { break } ;append y \",$x\" }; set y", ",0,1,2,3,4,5", RetOk},
 		{"set y {}; for {set x 0} {$x<10} {incr x} { if {$x == 5} { continue } ;append y \",$x\" }; set y", ",0,1,2,3,4,6,7,8,9", RetOk},
-		{"proc foo {} {catch {expr {1 +- }}}; foo", "not a number", RetOk},
+		{"proc foo {} {catch {expr {1 +- }}}; foo", "1", RetOk},
 		{"set x 0;while {$x<10} { incr x} ; set x", "10", RetOk},
 		{"concat a b {c d e} {f {g h}}", "a b c d e f {g h}", RetOk},
 		{"concat \" a b {c   \" d \"  e} f\"", "a b {c d e} f", RetOk},
@@ -128,6 +128,7 @@ func TestEval(t *testing.T) {
 		{"set data {1 {2 3} 4 {5 {6 7} 8}}; join $data", "1 2 3 4 5 {6 7} 8", RetOk},
 		{"set var 1; lappend var 2", "1 2", RetOk},
 		{"set var 1; lappend var 2; lappend var 3 4 5", "1 2 3 4 5", RetOk},
+		{"set var {}; lappend x 1 2 3; set x", "1 2 3", RetOk},
 		{"lindex {a b c}", "a b c", RetOk},
 		{"lindex {a b c} {}", "a b c", RetOk},
 		{"lindex {a b c} 0", "a", RetOk},
@@ -246,11 +247,42 @@ func TestEval(t *testing.T) {
 		{"string equal -nocase -length 3 \"abcde\" \"abcdefg\"", "1", RetOk},
 		{"string equal -length 0 a b", "1", RetOk},
 		{"string replace \"this is a bad example\" 10 12 good", "this is a good example", RetOk},
+		{"string hello", "string unknown function", RetError},
+		{"string repeat \"abc\" 3", "abcabcabc", RetOk},
+		{"string trim \"    h e l o    \"", "h e l o", RetOk},
+		{"string trimright \"    h e l o    \"", "    h e l o", RetOk},
+		{"string trimleft \"    h e l o    \"", "h e l o    ", RetOk},
+		{"set x {}; foreach {i j} {a b c d e f} { lappend x $j $i} ; set x", "b a d c f e", RetOk},
+		{"set x {}; foreach i {a b c} j {d e f g} { lappend x $i $j}; set x", "a d b e c f {} g", RetOk},
+		{"set x {}; foreach i {a b c} {j k} {d e f g} { lappend x $i $j $k}; set x", "a d e b f g c {} {}", RetOk},
+		{"proc compare {a b} { set a0 [lindex $a 0]; set b0 [lindex $b 0]; if {$a0 < $b0} { return -1 } " +
+			"elseif {$a0 > $b0} { return 1 }; return [string compare [lindex $a 1] [lindex $b 1]]}; " +
+			"lsort -command compare {{3 apple} {0x2 carrot} {1 dingo} {2 banana}} {1 dingo} {2 banana} {0x2 carrot} {3 apple}",
+			"{1 dingo} {2 banana} {0x2 carrot} {3 apple}",
+			RetOk,
+		},
+		{"set x 1; set y 2; set z 3; set a {}; if {$x==1} {set a $x}; set a", "1", RetOk},
+		{"set x 1; set y 2; set z 3; set a {};if {$x==1} {set a $x} else {set a $y}; set a", "1", RetOk},
+		{"set x 1; set y 2; set z 3; set a {};if {$x!=1} {set a $x} else {set a $y}; set a", "2", RetOk},
+		{"set x 1; set y 2; set z 3; set a {};if {$x!=1} {set a $x} elseif {$y==2} {set a $y}; set a", "2", RetOk},
+		{"set x 1; set y 2; set z 3;set a {};if {$x!=1} {set a $x} elseif {$y!=2} {set a $y} else {set a $z}; set a", "3", RetOk},
+		{"set x 1; incr x; rename incr add1; add1 x ; set x", "3", RetOk},
+		{"set x 1; incr x; set x", "2", RetOk},
+		{"set x 1; incr x 10 ; set x", "11", RetOk},
+		{"proc v {var} { upvar $var v; if [catch {set v}] {return 0} else {return 1}}; v x", "0", RetOk},
+		{"proc v {var} { upvar $var v; if [catch {set v}] {return 0} else {return 1}}; set x 1; v x", "1", RetOk},
+		{"proc foo {} {error bogus }; catch foo result", "1", RetOk},
+		{"proc foo {} {error bogus }; catch foo result; set result", "bogus", RetOk},
+		{"#comment", "", RetOk},
+		{"set x 5; set z 10; #comment ; set x", "10", RetOk},
+		{"set x 5; set z 10; #comment \n set x", "5", RetOk},
+		{"set x 5; set z 10; #comment \\\n continue \n set x", "5", RetOk},
+		{"set x \"ab\\tcd\"", "ab\tcd", RetOk},
 	}
 
 	for _, test := range testCases {
 		tcl := NewTCL()
-		t.Log("Test: " + test.test)
+		//	t.Log("Test: " + test.test)
 		ret := tcl.eval(test.test, parserOptions{})
 		if test.res != ret {
 			t.Errorf("Eval did not return correct results for %s, got: %d, expected %d", test.test, ret, test.res)
