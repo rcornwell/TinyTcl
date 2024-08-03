@@ -255,9 +255,10 @@ func TestEval(t *testing.T) {
 		{"set x {}; foreach {i j} {a b c d e f} { lappend x $j $i} ; set x", "b a d c f e", RetOk},
 		{"set x {}; foreach i {a b c} j {d e f g} { lappend x $i $j}; set x", "a d b e c f {} g", RetOk},
 		{"set x {}; foreach i {a b c} {j k} {d e f g} { lappend x $i $j $k}; set x", "a d e b f g c {} {}", RetOk},
-		{"proc compare {a b} { set a0 [lindex $a 0]; set b0 [lindex $b 0]; if {$a0 < $b0} { return -1 } " +
-			"elseif {$a0 > $b0} { return 1 }; return [string compare [lindex $a 1] [lindex $b 1]]}; " +
-			"lsort -command compare {{3 apple} {0x2 carrot} {1 dingo} {2 banana}} {1 dingo} {2 banana} {0x2 carrot} {3 apple}",
+		{
+			"proc compare {a b} { set a0 [lindex $a 0]; set b0 [lindex $b 0]; if {$a0 < $b0} { return -1 } " +
+				"elseif {$a0 > $b0} { return 1 }; return [string compare [lindex $a 1] [lindex $b 1]]}; " +
+				"lsort -command compare {{3 apple} {0x2 carrot} {1 dingo} {2 banana}} {1 dingo} {2 banana} {0x2 carrot} {3 apple}",
 			"{1 dingo} {2 banana} {0x2 carrot} {3 apple}",
 			RetOk,
 		},

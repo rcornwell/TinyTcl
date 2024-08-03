@@ -74,7 +74,7 @@ func (p *parser) getToken() bool {
 			if p.inQuote {
 				return p.parseString()
 			}
-			return p.parseSeperator()
+			return p.parseSeparator()
 
 		case '\n', '\r', ';':
 			if p.inQuote {
@@ -157,7 +157,7 @@ func (p *parser) parseIsSpace() bool {
 }
 
 // Skip over spaces. Return true if end of string.
-func (p *parser) parseSeperator() bool {
+func (p *parser) parseSeparator() bool {
 	p.start = p.pos
 	for p.parseIsSpace() {
 		p.next()

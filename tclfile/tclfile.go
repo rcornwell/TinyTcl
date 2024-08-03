@@ -142,7 +142,7 @@ func fileCopy(t *tcl.Tcl, args []string) int { //  -force -- source target
 		}
 
 		if stat.Mode().IsRegular() && !force {
-			return t.SetResult(tcl.RetError, "file exists and is not direcory")
+			return t.SetResult(tcl.RetError, "file exists and is not directory")
 		}
 	}
 
@@ -425,7 +425,7 @@ func fileRename(t *tcl.Tcl, args []string) int { // -force -- source target
 		}
 
 		if stat.Mode().IsRegular() && !force {
-			return t.SetResult(tcl.RetError, "file exists and is not direcory")
+			return t.SetResult(tcl.RetError, "file exists and is not directory")
 		}
 	}
 

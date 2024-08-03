@@ -4,7 +4,7 @@ Tiny Tcl is a Go version of TCL based on [picilo](https://github.com/howerj/pick
 expanded to include many standard TCl operators. This is a 
 pure interpreter, and supports only integer math. It is designed so that it can be embedded into an application. It can also easily be expanded to include new features. There is a sample of how an interpreter could be setup in main.go.
 
-To set up an interpreter, a TCL enviorment must be first created.
+To set up an interpreter, a TCL environment must be first created.
 
     import (  
 	    tcl "github.com/rcornwell/tinyTCL/tcl"  
@@ -70,8 +70,9 @@ To add new commands you will need to define a function of the form:
 The first argument is the Tcl interpreter structure. The second argument is the command and any arguments passed to the function. The last argument comes from the register function. It can be used to pass data or parameters to the command. To register a command with the Interpreter:
 
        tcl.Register("name", []string{arguments}, procedure, function)
+	   tcl.RegisterCmd("name", function)
 
-Proceedure is true for user defined proceedures, commands should set this to false. For user defined proceedures arguments holds the parameters, and body of function.
+Procedure is true for user defined procedures, commands should set this to false. For user defined procedures arguments holds the parameters, and body of function. RegisterCmd is a short version which creates an empty arguments array and sets procedure to false.
 
 The Tcl struct created by NewTcl() has one exported element. 
 
@@ -98,7 +99,7 @@ Convert string with backslash characters to one without backslash characters.
 	// Process escape character.
 	func UnEscape(str string) (string, int)
 
-Converts a string with numbers in it, into numbers. The arguments are the string to evaluate, default base, and position in the string to start looking for a number. Returns are the converted number, then position to continue for more numbers, and true/false depending on whether a number was conveted. Formats are +/-digits. 0 indicates octal, 0x indicates hex.
+Converts a string with numbers in it, into numbers. The arguments are the string to evaluate, default base, and position in the string to start looking for a number. Returns are the converted number, then position to continue for more numbers, and true/false depending on whether a number was converted. Formats are +/-digits. 0 indicates octal, 0x indicates hex.
 
 	func ConvertStringToNumber(str string, base int, pos int) (int, int, bool)
 
@@ -122,7 +123,7 @@ Match does glob matches for a string. Return -1 if depth exceeded, 0 if no match
 
 	func Match(pat string, target string, nocase bool, depth int) int 
 
-NewTCL creates a new TCL interpreter enviorment and initializes the default commands.
+NewTCL creates a new TCL interpreter environment and initializes the default commands.
 
 	func NewTCL() *Tcl 
 

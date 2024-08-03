@@ -34,55 +34,59 @@ import (
 
 // Register commands.
 func (tcl *Tcl) tclInitCommands() {
-	str := []string{}
-	tcl.Register("append", str, false, cmdAppend)
+	tcl.RegisterCmd("append", cmdAppend)
 	tcl.Register("break", []string{"break"}, false, cmdFlow)
-	tcl.Register("catch", str, false, cmdCatch)
-	tcl.Register("concat", str, false, cmdConcat)
+	tcl.RegisterCmd("catch", cmdCatch)
+	tcl.RegisterCmd("concat", cmdConcat)
 	tcl.Register("continue", []string{"continue"}, false, cmdFlow)
-	tcl.Register("decr", str, false, cmdDecr)
-	tcl.Register("eq", str, false, cmdEqual)
-	tcl.Register("error", str, false, cmdError)
-	tcl.Register("eval", str, false, cmdEval)
+	tcl.RegisterCmd("decr", cmdDecr)
+	tcl.RegisterCmd("eq", cmdEqual)
+	tcl.RegisterCmd("error", cmdError)
+	tcl.RegisterCmd("eval", cmdEval)
 	tcl.Register("exit", []string{"exit"}, false, cmdFlow)
-	tcl.Register("expr", str, false, cmdMath)
-	tcl.Register("for", str, false, cmdFor)
-	tcl.Register("foreach", str, false, cmdForEach)
-	tcl.Register("global", str, false, cmdGlobal)
-	tcl.Register("if", str, false, cmdIf)
-	tcl.Register("info", str, false, cmdInfo)
-	tcl.Register("incr", str, false, cmdIncr)
-	tcl.Register("join", str, false, cmdJoin)
-	tcl.Register("lappend", str, false, cmdLAppend)
-	tcl.Register("lindex", str, false, cmdLIndex)
-	tcl.Register("linsert", str, false, cmdLInsert)
-	tcl.Register("list", str, false, cmdList)
-	tcl.Register("llength", str, false, cmdLLength)
-	tcl.Register("lrange", str, false, cmdLRange)
-	tcl.Register("lreplace", str, false, cmdLReplace)
-	tcl.Register("lsearch", str, false, cmdLSearch)
-	tcl.Register("lset", str, false, cmdLSet)
-	tcl.Register("lsort", str, false, cmdLSort)
-	tcl.Register("ne", str, false, cmdNotEqual)
-	tcl.Register("proc", str, false, cmdProc)
-	tcl.Register("puts", str, false, cmdPuts)
-	tcl.Register("rename", str, false, cmdRename)
+	tcl.RegisterCmd("expr", cmdMath)
+	tcl.RegisterCmd("for", cmdFor)
+	tcl.RegisterCmd("foreach", cmdForEach)
+	tcl.RegisterCmd("global", cmdGlobal)
+	tcl.RegisterCmd("if", cmdIf)
+	tcl.RegisterCmd("info", cmdInfo)
+	tcl.RegisterCmd("incr", cmdIncr)
+	tcl.RegisterCmd("join", cmdJoin)
+	tcl.RegisterCmd("lappend", cmdLAppend)
+	tcl.RegisterCmd("lindex", cmdLIndex)
+	tcl.RegisterCmd("linsert", cmdLInsert)
+	tcl.RegisterCmd("list", cmdList)
+	tcl.RegisterCmd("llength", cmdLLength)
+	tcl.RegisterCmd("lrange", cmdLRange)
+	tcl.RegisterCmd("lreplace", cmdLReplace)
+	tcl.RegisterCmd("lsearch", cmdLSearch)
+	tcl.RegisterCmd("lset", cmdLSet)
+	tcl.RegisterCmd("lsort", cmdLSort)
+	tcl.RegisterCmd("ne", cmdNotEqual)
+	tcl.RegisterCmd("proc", cmdProc)
+	tcl.RegisterCmd("puts", cmdPuts)
+	tcl.RegisterCmd("rename", cmdRename)
 	tcl.Register("return", []string{"return"}, false, cmdFlow)
-	tcl.Register("set", str, false, cmdSet)
-	tcl.Register("split", str, false, cmdSplit)
-	tcl.Register("string", str, false, cmdString)
-	tcl.Register("subst", str, false, cmdSubstr)
-	tcl.Register("switch", str, false, cmdSwitch)
-	// tcl.Register("uplevel", str, false,cmdUpLevel)
-	tcl.Register("upvar", str, false, cmdUpVar)
-	tcl.Register("unset", str, false, cmdUnSet)
-	tcl.Register("variable", str, false, cmdVariable)
-	tcl.Register("while", str, false, cmdWhile)
+	tcl.RegisterCmd("set", cmdSet)
+	tcl.RegisterCmd("split", cmdSplit)
+	tcl.RegisterCmd("string", cmdString)
+	tcl.RegisterCmd("subst", cmdSubstr)
+	tcl.RegisterCmd("switch", cmdSwitch)
+	// tcl.RegisterCmd("uplevel", cmdUpLevel)
+	tcl.RegisterCmd("upvar", cmdUpVar)
+	tcl.RegisterCmd("unset", cmdUnSet)
+	tcl.RegisterCmd("variable", cmdVariable)
+	tcl.RegisterCmd("while", cmdWhile)
 }
 
 // Register a command. Arg is passed to function when called.
 func (tcl *Tcl) Register(name string, arg []string, proc bool, fn func(*Tcl, []string, []string) int) {
 	tcl.cmds[name] = &tclCmd{fn: fn, arg: arg, proc: proc}
+}
+
+// Register a command. Arg is passed to function when called.
+func (tcl *Tcl) RegisterCmd(name string, fn func(*Tcl, []string, []string) int) {
+	tcl.cmds[name] = &tclCmd{fn: fn, arg: []string{}, proc: false}
 }
 
 // Evaluate an argument, and catch any errors.
@@ -182,7 +186,7 @@ func userProc(tcl *Tcl, args []string, arg []string) int {
 	}
 
 	newenv.args = strings.Join(args, " ")
-	// Switch to new environment and evalute body of function.
+	// Switch to new environment and evaluate body of function.
 	tcl.pushEnv(newenv)
 	ret := tcl.eval(body, parserOptions{})
 	tcl.popEnv()
@@ -202,7 +206,7 @@ func cmdProc(tcl *Tcl, args []string, _ []string) int {
 	return RetOk
 }
 
-// Create link to variable in current envirorment.
+// Create link to variable in current environment.
 func cmdUpVar(tcl *Tcl, args []string, _ []string) int {
 	if len(args) < 3 {
 		return tcl.SetResult(RetError, "upvar ?level varname var ?otherVar myVar")
@@ -256,7 +260,7 @@ func cmdGlobal(tcl *Tcl, args []string, _ []string) int {
 		return tcl.SetResult(RetError, "no top level?")
 	}
 
-	// Get a variable at a envirorment.
+	// Get a variable at a environment.
 	for v := 1; v < len(args); v++ {
 		variable, ok := env.vars[args[v]]
 		if !ok {
@@ -273,7 +277,7 @@ func cmdVariable(tcl *Tcl, args []string, _ []string) int {
 		return tcl.SetResult(RetError, "variable name ?value")
 	}
 
-	// Get a variable at a envirorment.
+	// Get a variable at a environment.
 	for v := 1; v < len(args); v += 2 {
 		if (v + 1) < len(args) {
 			tcl.SetVarValue(args[v], args[v+1])
@@ -289,7 +293,7 @@ func cmdRename(tcl *Tcl, args []string, _ []string) int {
 	}
 	cmd, ok := tcl.cmds[args[1]]
 	if !ok {
-		return tcl.SetResult(RetError, "comand "+args[1]+" not found")
+		return tcl.SetResult(RetError, "command "+args[1]+" not found")
 	}
 	tcl.cmds[args[1]] = nil
 	if len(args) == 3 {
@@ -709,7 +713,7 @@ func cmdDecr(tcl *Tcl, args []string, _ []string) int {
 	return RetOk
 }
 
-// Concatinate all arguments to one string.
+// Concatenate all arguments to one string.
 func cmdConcat(tcl *Tcl, args []string, _ []string) int {
 	for i := range args {
 		args[i] = strings.TrimSpace(args[i])
@@ -731,7 +735,7 @@ func cmdJoin(tcl *Tcl, args []string, _ []string) int {
 	return tcl.SetResult(RetOk, strings.Join(list, join))
 }
 
-// Evalute arguments.
+// Evaluate arguments.
 func cmdEval(tcl *Tcl, args []string, _ []string) int {
 	return tcl.eval(strings.Join(args[1:], " "), parserOptions{})
 }

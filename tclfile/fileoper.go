@@ -39,16 +39,16 @@ type tclFileData struct {
 
 // Register commands.
 func FileInit(tcl *tcl.Tcl) {
-	tcl.Register("file", []string{}, false, cmdFile)
-	tcl.Register("eof", []string{}, false, cmdEOF)
-	tcl.Register("open", []string{}, false, cmdOpen)
-	tcl.Register("close", []string{}, false, cmdClose)
-	tcl.Register("gets", []string{}, false, cmdGets)
-	tcl.Register("read", []string{}, false, cmdRead)
-	tcl.Register("puts", []string{}, false, cmdPuts)
-	tcl.Register("seek", []string{}, false, cmdSeek)
-	tcl.Register("tell", []string{}, false, cmdSeek)
-	tcl.Register("flush", []string{}, false, cmdFlush)
+	tcl.RegisterCmd("file", cmdFile)
+	tcl.RegisterCmd("eof", cmdEOF)
+	tcl.RegisterCmd("open", cmdOpen)
+	tcl.RegisterCmd("close", cmdClose)
+	tcl.RegisterCmd("gets", cmdGets)
+	tcl.RegisterCmd("read", cmdRead)
+	tcl.RegisterCmd("puts", cmdPuts)
+	tcl.RegisterCmd("seek", cmdSeek)
+	tcl.RegisterCmd("tell", cmdSeek)
+	tcl.RegisterCmd("flush", cmdFlush)
 	data := tclFileData{}
 	data.channels = make(map[string]*os.File)
 	data.eof = make(map[string]bool)
@@ -108,7 +108,7 @@ func cmdOpen(t *tcl.Tcl, args []string, _ []string) int {
 	return t.SetResult(tcl.RetOk, channel)
 }
 
-// Close a file based on channel idenifier.
+// Close a file based on channel identifier.
 func cmdClose(t *tcl.Tcl, args []string, _ []string) int {
 	if len(args) < 2 || len(args) > 3 {
 		return t.SetResult(tcl.RetError, "close channel")

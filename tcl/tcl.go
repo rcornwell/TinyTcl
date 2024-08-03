@@ -68,7 +68,7 @@ type tclVar struct {
 
 // Current running environment.
 type tclEnv struct {
-	vars   map[string]*tclVar // All excessible variables.
+	vars   map[string]*tclVar // All accessible variables.
 	local  map[string]bool    // Is this name local to procedure
 	parent *tclEnv            // Parent nesting level.
 	args   string             // Current arguments.
