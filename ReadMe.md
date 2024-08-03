@@ -26,6 +26,8 @@ Each call to EvalString will process one string.
 
 ### Basic Commands
 
+More information about the syntax of these commands can be found on various Tcl help pages. Most options are supported, some which don't make sense have been left off. TinyTcl does not support arrays at this time, so commands referencing arrays have not been implemented.
+
 append concat catch decr eq error eval exit expr incr join
 ne puts set subst unset
 
@@ -39,10 +41,25 @@ proc rename return global upvar variable
 
 ### List commands
 
-lappend llength lindex linsert list lrange lreplace lsearch lset lsort split
+foreach lappend llength lindex linsert list lrange lreplace lsearch lset lsort split
 
 ### Extra commands
 string info
+
+## File Extension
+
+To add commands for working with files to a TCL instance do:
+
+	import (file "github.com/rcornwell/tinyTCL/tclfile")
+
+	// Add in file commands.
+	file.FileInit(tinyTcl)
+
+This will add in:
+
+close eof file flush gets open puts read seek tell
+
+This extension also replaces the puts command to take a channel to write the message to.
 
 ## Adding new commands
 
@@ -55,6 +72,24 @@ The first argument is the Tcl interpreter structure. The second argument is the 
        tcl.Register("name", []string{arguments}, procedure, function)
 
 Proceedure is true for user defined proceedures, commands should set this to false. For user defined proceedures arguments holds the parameters, and body of function.
+
+The Tcl struct created by NewTcl() has one exported element. 
+
+		Data   map[string]any     // Place for extensions to store data.
+
+Extensions that need to hold data to be passed to various commands can create a struct and place a pointer to it there like:
+
+	data := tclExtData{}
+	tcl.Data["exten"] = &data
+
+In a command proceedure this can be accessed by:
+
+	data, ok := t.Data["exten"].(*tclExtData)
+	if !ok {
+		panic("invalid data type extension")
+	}
+
+If the data is not in the map, it means that you are being called from wrong instance of the interpreter and there is nothing more you can do. This should not happen, hence the panic.
 
 ## Helper functions
 
