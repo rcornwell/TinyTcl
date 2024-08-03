@@ -194,6 +194,9 @@ func userProc(tcl *Tcl, args []string, arg []string) int {
 
 // Create a user procedure.
 func cmdProc(tcl *Tcl, args []string, _ []string) int {
+	if len(args) != 4 {
+		return tcl.SetResult(RetError, "proc args body")
+	}
 	name := args[1]
 	tcl.Register(name, args, true, userProc)
 	return RetOk
@@ -313,7 +316,6 @@ func cmdIf(tcl *Tcl, args []string, _ []string) int {
 	// Make sure arguments are correct.
 	for i < n {
 		if args[i] == "else" {
-			i += 2
 			break
 		}
 		if args[i] == "elseif" {
