@@ -92,14 +92,14 @@ func cmdOpen(t *tcl.Tcl, args []string, _ []string) int {
 		return t.SetResult(tcl.RetError, "invalid permissions "+perms)
 	}
 
-	file, err := os.OpenFile(name, mode, os.FileMode(perm))
-	if err != nil {
-		return t.SetResult(tcl.RetError, "unable to open file "+name+" "+err.Error())
-	}
-
 	files, ok := t.Data["file"].(*tclFileData)
 	if !ok {
 		panic("invalid data type file extension")
+	}
+
+	file, err := os.OpenFile(name, mode, os.FileMode(perm))
+	if err != nil {
+		return t.SetResult(tcl.RetError, "unable to open file "+name+" "+err.Error())
 	}
 
 	channel := "file" + tcl.ConvertNumberToString(int(file.Fd()), 10)
