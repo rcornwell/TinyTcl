@@ -56,9 +56,10 @@ type Tcl struct {
 
 // Commands, function amd default arguments.
 type tclCmd struct {
-	fn   func(*Tcl, []string, []string) int
+	fn   func(*Tcl, []string) int
 	proc bool
-	arg  []string
+	args string // Procedure arguments.
+	body string // Procedure body.
 }
 
 // Holds data relative to variables.
@@ -99,13 +100,19 @@ func (tcl *Tcl) GetResult() string {
 func (tcl *Tcl) EvalString(str string) error {
 	ret := tcl.eval(str, parserOptions{})
 	switch ret {
-	case RetOk:
+	case RetOk, RetReturn:
 		return nil
+
 	case RetExit:
 		return ErrExit
-	default:
-		return ErrError
+
+	case RetBreak:
+		tcl.result = "executing \"break\" outside a loop"
+
+	case RetContinue:
+		tcl.result = "executing \"continue\" outside a loop"
 	}
+	return ErrError
 }
 
 // Evaluate a TCL expression.
@@ -149,6 +156,7 @@ func (tcl *Tcl) eval(str string, opts parserOptions) int {
 						tcl.result = strings.Join(args, " ")
 						return RetOk
 					}
+
 					if err == RetContinue || err == RetReturn {
 						val = tcl.result
 						break
@@ -224,5 +232,5 @@ func (tcl *Tcl) doCommand(args []string) int {
 		tcl.result = "unable to find command: " + args[0]
 		return RetError
 	}
-	return cmd.fn(tcl, args, cmd.arg)
+	return cmd.fn(tcl, args)
 }

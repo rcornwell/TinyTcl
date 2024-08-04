@@ -65,14 +65,14 @@ This extension also replaces the puts command to take a channel to write the mes
 
 To add new commands you will need to define a function of the form:  
 
-       func command(*tcl, []string, []string) int
+       func command(*Tcl, []string) int
 
-The first argument is the Tcl interpreter structure. The second argument is the command and any arguments passed to the function. The last argument comes from the register function. It can be used to pass data or parameters to the command. To register a command with the Interpreter:
+The first argument is the Tcl interpreter structure. The second argument is the command and any arguments passed to the function. 
+Interpreter:
 
-       tcl.Register("name", []string{arguments}, procedure, function)
-	   tcl.RegisterCmd("name", function)
+	   tcl.Register("name", function)
 
-Procedure is true for user defined procedures, commands should set this to false. For user defined procedures arguments holds the parameters, and body of function. RegisterCmd is a short version which creates an empty arguments array and sets procedure to false.
+Procedure is true for user defined procedures, commands should set this to false.
 
 The Tcl struct created by NewTcl() has one exported element. 
 

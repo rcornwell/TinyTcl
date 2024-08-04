@@ -51,7 +51,7 @@ var funmap = map[string]func(*Tcl, []string) int{
 	"trimright": stringTrim,    // string ?chars
 }
 
-func cmdString(tcl *Tcl, args []string, _ []string) int {
+func cmdString(tcl *Tcl, args []string) int {
 	if len(args) < 2 {
 		return tcl.SetResult(RetError, "string function")
 	}
@@ -528,7 +528,7 @@ func stringTrim(tcl *Tcl, args []string) int {
 }
 
 // Report on various information about the system.
-func cmdInfo(tcl *Tcl, args []string, _ []string) int {
+func cmdInfo(tcl *Tcl, args []string) int {
 	if len(args) < 2 {
 		return tcl.SetResult(RetError, "info function")
 	}
@@ -542,7 +542,7 @@ func cmdInfo(tcl *Tcl, args []string, _ []string) int {
 		if !cmd.proc {
 			return tcl.SetResult(RetError, args[2]+" not a proc")
 		}
-		return tcl.SetResult(RetOk, cmd.arg[2])
+		return tcl.SetResult(RetOk, cmd.args)
 
 	case "body": // info body procname
 		if len(args) != 3 {
@@ -552,7 +552,7 @@ func cmdInfo(tcl *Tcl, args []string, _ []string) int {
 		if !cmd.proc {
 			return tcl.SetResult(RetError, args[2]+" not a proc")
 		}
-		return tcl.SetResult(RetOk, cmd.arg[3])
+		return tcl.SetResult(RetOk, cmd.body)
 
 	case "commands": // info commands ?pattern
 		list = tcl.listCommands(false)

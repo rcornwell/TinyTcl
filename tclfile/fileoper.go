@@ -39,16 +39,16 @@ type tclFileData struct {
 
 // Register commands.
 func FileInit(tcl *tcl.Tcl) {
-	tcl.RegisterCmd("file", cmdFile)
-	tcl.RegisterCmd("eof", cmdEOF)
-	tcl.RegisterCmd("open", cmdOpen)
-	tcl.RegisterCmd("close", cmdClose)
-	tcl.RegisterCmd("gets", cmdGets)
-	tcl.RegisterCmd("read", cmdRead)
-	tcl.RegisterCmd("puts", cmdPuts)
-	tcl.RegisterCmd("seek", cmdSeek)
-	tcl.RegisterCmd("tell", cmdSeek)
-	tcl.RegisterCmd("flush", cmdFlush)
+	tcl.Register("file", cmdFile)
+	tcl.Register("eof", cmdEOF)
+	tcl.Register("open", cmdOpen)
+	tcl.Register("close", cmdClose)
+	tcl.Register("gets", cmdGets)
+	tcl.Register("read", cmdRead)
+	tcl.Register("puts", cmdPuts)
+	tcl.Register("seek", cmdSeek)
+	tcl.Register("tell", cmdSeek)
+	tcl.Register("flush", cmdFlush)
 	data := tclFileData{}
 	data.channels = make(map[string]*os.File)
 	data.eof = make(map[string]bool)
@@ -62,7 +62,7 @@ func FileInit(tcl *tcl.Tcl) {
 }
 
 // Open a file, return channel identifier.
-func cmdOpen(t *tcl.Tcl, args []string, _ []string) int {
+func cmdOpen(t *tcl.Tcl, args []string) int {
 	name := ""
 	access := "r"
 	perms := "0666"
@@ -109,7 +109,7 @@ func cmdOpen(t *tcl.Tcl, args []string, _ []string) int {
 }
 
 // Close a file based on channel identifier.
-func cmdClose(t *tcl.Tcl, args []string, _ []string) int {
+func cmdClose(t *tcl.Tcl, args []string) int {
 	if len(args) < 2 || len(args) > 3 {
 		return t.SetResult(tcl.RetError, "close channel")
 	}
@@ -136,7 +136,7 @@ func cmdClose(t *tcl.Tcl, args []string, _ []string) int {
 }
 
 // Return if channel is at EOF.
-func cmdEOF(t *tcl.Tcl, args []string, _ []string) int {
+func cmdEOF(t *tcl.Tcl, args []string) int {
 	if len(args) != 2 {
 		return t.SetResult(tcl.RetError, "eof channel")
 	}
@@ -157,7 +157,7 @@ func cmdEOF(t *tcl.Tcl, args []string, _ []string) int {
 }
 
 // Return if channel is at EOF.
-func cmdRead(t *tcl.Tcl, args []string, _ []string) int {
+func cmdRead(t *tcl.Tcl, args []string) int {
 	if len(args) < 2 {
 		return t.SetResult(tcl.RetError, "read ?-nonewline channel numchars")
 	}
@@ -219,7 +219,7 @@ func cmdRead(t *tcl.Tcl, args []string, _ []string) int {
 }
 
 // Get a string from a channel.
-func cmdGets(t *tcl.Tcl, args []string, _ []string) int {
+func cmdGets(t *tcl.Tcl, args []string) int {
 	if len(args) < 2 || len(args) > 3 {
 		return t.SetResult(tcl.RetError, "gets channel ?varname")
 	}
@@ -263,7 +263,7 @@ func cmdGets(t *tcl.Tcl, args []string, _ []string) int {
 }
 
 // Write a string to a channel.
-func cmdPuts(t *tcl.Tcl, args []string, _ []string) int {
+func cmdPuts(t *tcl.Tcl, args []string) int {
 	if len(args) < 2 {
 		return t.SetResult(tcl.RetError, "puts ?-nonewline ?file text")
 	}
@@ -281,7 +281,7 @@ func cmdPuts(t *tcl.Tcl, args []string, _ []string) int {
 		i++
 	}
 
-	if len(args) > i {
+	if len(args) > (i + 1) {
 		ok := false
 		file, ok = files.channels[args[i]]
 		if !ok {
@@ -303,7 +303,7 @@ func cmdPuts(t *tcl.Tcl, args []string, _ []string) int {
 }
 
 // Seek or Tell command.
-func cmdSeek(t *tcl.Tcl, args []string, _ []string) int {
+func cmdSeek(t *tcl.Tcl, args []string) int {
 	// tell channel ->  position
 	// seek channel offset ?origin
 	files, ok := t.Data["file"].(*tclFileData)
@@ -356,7 +356,7 @@ func cmdSeek(t *tcl.Tcl, args []string, _ []string) int {
 }
 
 // Flush any pending output for a channel.
-func cmdFlush(t *tcl.Tcl, args []string, _ []string) int {
+func cmdFlush(t *tcl.Tcl, args []string) int {
 	if len(args) != 2 {
 		return t.SetResult(tcl.RetError, "flush channel")
 	}

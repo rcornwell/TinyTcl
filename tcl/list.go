@@ -32,7 +32,7 @@ import (
 )
 
 // Join list items in first argument, with second argument.
-func cmdList(tcl *Tcl, args []string, _ []string) int {
+func cmdList(tcl *Tcl, args []string) int {
 	str := ""
 
 	for _, item := range args[1:] {
@@ -42,7 +42,7 @@ func cmdList(tcl *Tcl, args []string, _ []string) int {
 }
 
 // Return the number of elements in a list.
-func cmdLLength(tcl *Tcl, args []string, _ []string) int {
+func cmdLLength(tcl *Tcl, args []string) int {
 	if len(args) != 2 {
 		tcl.result = "llength list"
 		return RetError
@@ -100,7 +100,7 @@ func convertListIndex(str string, listMax int, pos int) (int, int, bool) {
 }
 
 // Returns selected elements from a list.
-func cmdLIndex(tcl *Tcl, args []string, _ []string) int {
+func cmdLIndex(tcl *Tcl, args []string) int {
 	if len(args) < 2 {
 		tcl.result = "lindex list ?index"
 		return RetError
@@ -136,11 +136,11 @@ func cmdLIndex(tcl *Tcl, args []string, _ []string) int {
 	}
 
 	// Let list build result.
-	return cmdList(tcl, res, []string{})
+	return cmdList(tcl, res)
 }
 
 // Returns list starting at first and ending at last.
-func cmdLRange(tcl *Tcl, args []string, _ []string) int {
+func cmdLRange(tcl *Tcl, args []string) int {
 	if len(args) < 4 {
 		tcl.result = "lrange list first last"
 		return RetError
@@ -162,11 +162,11 @@ func cmdLRange(tcl *Tcl, args []string, _ []string) int {
 	res = append(res, list[first:last+1]...)
 
 	// Let list build result.
-	return cmdList(tcl, res, []string{})
+	return cmdList(tcl, res)
 }
 
 // Appends a list to an existing list.
-func cmdLAppend(tcl *Tcl, args []string, _ []string) int {
+func cmdLAppend(tcl *Tcl, args []string) int {
 	if len(args) < 2 {
 		tcl.result = "lappend list ?values"
 		return RetError
@@ -183,7 +183,7 @@ func cmdLAppend(tcl *Tcl, args []string, _ []string) int {
 }
 
 // Insert a list into a list.
-func cmdLInsert(tcl *Tcl, args []string, _ []string) int {
+func cmdLInsert(tcl *Tcl, args []string) int {
 	if len(args) < 3 {
 		tcl.result = "linsert list index ?values"
 		return RetError
@@ -200,11 +200,11 @@ func cmdLInsert(tcl *Tcl, args []string, _ []string) int {
 	newList = append(newList, list[index:]...)
 
 	// Let List put things back together.
-	return cmdList(tcl, newList, []string{})
+	return cmdList(tcl, newList)
 }
 
 // Replace elements of list with new elements.
-func cmdLReplace(tcl *Tcl, args []string, _ []string) int {
+func cmdLReplace(tcl *Tcl, args []string) int {
 	if len(args) < 3 {
 		tcl.result = "lreplace list first last ?elements"
 		return RetError
@@ -229,7 +229,7 @@ func cmdLReplace(tcl *Tcl, args []string, _ []string) int {
 	newList = append(newList, list[last+1:]...)
 
 	// Let List put things back together.
-	return cmdList(tcl, newList, []string{})
+	return cmdList(tcl, newList)
 }
 
 // Compare two elements.
@@ -271,7 +271,7 @@ func (tcl *Tcl) order(integer bool, reverse bool, command, a, b string) (bool, i
 }
 
 // Sort a list.
-func cmdLSort(tcl *Tcl, args []string, _ []string) int {
+func cmdLSort(tcl *Tcl, args []string) int {
 	integer := false
 	reverse := false
 	command := ""
@@ -313,7 +313,7 @@ outer:
 		list[k+1] = key
 	}
 	list = append([]string{"list"}, list...)
-	return cmdList(tcl, list, []string{})
+	return cmdList(tcl, list)
 }
 
 const (
@@ -324,7 +324,7 @@ const (
 )
 
 // Sort a list.
-func cmdLSearch(tcl *Tcl, args []string, _ []string) int {
+func cmdLSearch(tcl *Tcl, args []string) int {
 	op := opGlob
 	all := false
 	inline := false
@@ -429,11 +429,11 @@ matchLoop:
 		result = append(result, "-1")
 	}
 
-	return cmdList(tcl, result, []string{})
+	return cmdList(tcl, result)
 }
 
 // Elements in a list.
-func cmdLSet(tcl *Tcl, args []string, _ []string) int {
+func cmdLSet(tcl *Tcl, args []string) int {
 	if len(args) < 3 {
 		tcl.result = "lset varName ?index list"
 		return RetError
@@ -494,7 +494,7 @@ func cmdLSet(tcl *Tcl, args []string, _ []string) int {
 }
 
 // Split string based on delimiters.
-func cmdSplit(tcl *Tcl, args []string, _ []string) int {
+func cmdSplit(tcl *Tcl, args []string) int {
 	if len(args) < 2 || len(args) > 3 {
 		return tcl.SetResult(RetError, "split string ?splitChars?")
 	}
@@ -527,11 +527,11 @@ func cmdSplit(tcl *Tcl, args []string, _ []string) int {
 	if current != "" {
 		result = append(result, current)
 	}
-	return cmdList(tcl, result, []string{})
+	return cmdList(tcl, result)
 }
 
 // Foreach command.
-func cmdForEach(tcl *Tcl, args []string, _ []string) int {
+func cmdForEach(tcl *Tcl, args []string) int {
 	type argList struct {
 		vars  []string // variables.
 		list  []string // Values of list.

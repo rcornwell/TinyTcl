@@ -80,7 +80,7 @@ var openModes = map[string]int{
 }
 
 // Handle File commands.
-func cmdFile(t *tcl.Tcl, args []string, _ []string) int {
+func cmdFile(t *tcl.Tcl, args []string) int {
 	if len(args) < 2 {
 		return t.SetResult(tcl.RetError, "file function")
 	}
