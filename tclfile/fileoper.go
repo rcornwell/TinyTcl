@@ -28,6 +28,7 @@ package tclfile
 import (
 	"io"
 	"os"
+	"strings"
 
 	tcl "github.com/rcornwell/tinyTCL/tcl"
 )
@@ -38,17 +39,18 @@ type tclFileData struct {
 }
 
 // Register commands.
-func FileInit(tcl *tcl.Tcl) {
-	tcl.Register("file", cmdFile)
-	tcl.Register("eof", cmdEOF)
-	tcl.Register("open", cmdOpen)
-	tcl.Register("close", cmdClose)
-	tcl.Register("gets", cmdGets)
-	tcl.Register("read", cmdRead)
-	tcl.Register("puts", cmdPuts)
-	tcl.Register("seek", cmdSeek)
-	tcl.Register("tell", cmdSeek)
-	tcl.Register("flush", cmdFlush)
+func FileInit(t *tcl.Tcl) {
+	t.Register("close", cmdClose)
+	t.Register("eof", cmdEOF)
+	t.Register("file", cmdFile)
+	t.Register("flush", cmdFlush)
+	t.Register("gets", cmdGets)
+	t.Register("open", cmdOpen)
+	t.Register("read", cmdRead)
+	t.Register("puts", cmdPuts)
+	t.Register("seek", func(t *tcl.Tcl, a []string) int { return cmdSeek(t, a, "seek") })
+	t.Register("source", cmdSource)
+	t.Register("tell", func(t *tcl.Tcl, a []string) int { return cmdSeek(t, a, "tell") })
 	data := tclFileData{}
 	data.channels = make(map[string]*os.File)
 	data.eof = make(map[string]bool)
@@ -58,7 +60,7 @@ func FileInit(tcl *tcl.Tcl) {
 	data.eof["stdout"] = false
 	data.channels["stderr"] = os.Stderr
 	data.eof["stderr"] = false
-	tcl.Data["file"] = &data
+	t.Data["file"] = &data
 }
 
 // Open a file, return channel identifier.
@@ -302,8 +304,29 @@ func cmdPuts(t *tcl.Tcl, args []string) int {
 	return t.SetResult(tcl.RetOk, "")
 }
 
+// Read a file in and run it as a command.
+func cmdSource(t *tcl.Tcl, args []string) int {
+	if len(args) < 2 {
+		return t.SetResult(tcl.RetError, "source file ?args")
+	}
+	text, err := os.ReadFile(args[1])
+	if err != nil {
+		panic(err)
+	}
+	t.SetVarValue("argv0", args[1])
+	if len(args) > 2 {
+		t.SetVarValue("argv", strings.Join(args[2:], " "))
+		t.SetVarValue("argc", tcl.ConvertNumberToString(len(args[2:]), 10))
+	}
+	err = t.EvalString(string(text))
+	if err != nil {
+		return t.SetResult(tcl.RetError, err.Error())
+	}
+	return t.SetResult(tcl.RetOk, "")
+}
+
 // Seek or Tell command.
-func cmdSeek(t *tcl.Tcl, args []string) int {
+func cmdSeek(t *tcl.Tcl, args []string, name string) int {
 	// tell channel ->  position
 	// seek channel offset ?origin
 	files, ok := t.Data["file"].(*tclFileData)
@@ -319,9 +342,9 @@ func cmdSeek(t *tcl.Tcl, args []string) int {
 	if !ok {
 		return t.SetResult(tcl.RetError, "file "+args[1]+" not opened")
 	}
-	origin := io.SeekStart
+	origin := io.SeekCurrent
 	offset := 0
-	if args[0] == "seek" {
+	if name == "seek" {
 		if len(args) > 4 {
 			return t.SetResult(tcl.RetError, "seek channel offset ?origin")
 		}
@@ -349,7 +372,7 @@ func cmdSeek(t *tcl.Tcl, args []string) int {
 	if err != nil {
 		return t.SetResult(tcl.RetError, err.Error())
 	}
-	if args[0] == "seek" {
+	if name == "seek" {
 		return t.SetResult(tcl.RetOk, "")
 	}
 	return t.SetResult(tcl.RetOk, tcl.ConvertNumberToString(int(position), 10))

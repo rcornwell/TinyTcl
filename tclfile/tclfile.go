@@ -27,7 +27,6 @@ package tclfile
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -46,7 +45,7 @@ var funmap = map[string]func(*tcl.Tcl, []string) int{
 	"dir":         fileDir,       // ?dir
 	"dirname":     filePath,      // name
 	"executable":  fileType,      // name
-	"exists":      fileType,      // name
+	"exists":      fileExists,    // name
 	"extension":   filePath,      // name
 	"isdirectory": fileType,      // name
 	"isfile":      fileType,      // name
@@ -147,7 +146,6 @@ func fileCopy(t *tcl.Tcl, args []string) int { //  -force -- source target
 	}
 
 	for len(args) > (i + 1) {
-		fmt.Println("copy ", target, len(args), i, args[i])
 		err = copyFile(args[i], target, dir, force)
 		if err != nil {
 			return t.SetResult(tcl.RetError, err.Error())
@@ -204,7 +202,6 @@ func fileDelete(t *tcl.Tcl, args []string) int { //  -force -- pathname???
 	}
 
 	for len(args) > i {
-		fmt.Println("delete ", len(args), i, args[i])
 		err := os.Remove(args[i])
 		if err != nil {
 			return t.SetResult(tcl.RetError, err.Error())
@@ -239,39 +236,32 @@ func fileType(t *tcl.Tcl, args []string) int { // name
 	if len(args) > 3 {
 		return t.SetResult(tcl.RetError, "file "+args[1]+" name")
 	}
-	exists := true // Assume file exists.
 	info, err := os.Lstat(args[2])
 	if err != nil {
 		if os.IsNotExist(err) {
-			exists = false
+			return t.SetResult(tcl.RetError, "file "+args[2]+" does not exist")
 		} else {
 			return t.SetResult(tcl.RetError, err.Error())
 		}
 	}
+
 	switch args[1] {
 	case "atime", "mtime":
 		time := info.ModTime()
 		return t.SetResult(tcl.RetOk, tcl.ConvertNumberToString(int(time.Unix()), 10))
 
-	case "exists":
-		if exists {
-			return t.SetResult(tcl.RetOk, "1")
-		}
-
 	case "isdirectory":
-		if exists && info.IsDir() {
+		if info.IsDir() {
 			return t.SetResult(tcl.RetOk, "1")
 		}
 
 	case "isfile":
-		if exists && info.Mode().IsRegular() {
+		if info.Mode().IsRegular() {
 			return t.SetResult(tcl.RetOk, "1")
 		}
 
 	case "size":
-		if exists {
-			return t.SetResult(tcl.RetOk, tcl.ConvertNumberToString(int(info.Size()), 10))
-		}
+		return t.SetResult(tcl.RetOk, tcl.ConvertNumberToString(int(info.Size()), 10))
 
 	case "type":
 		ftype := ""
@@ -300,6 +290,22 @@ func fileType(t *tcl.Tcl, args []string) int { // name
 	return t.SetResult(tcl.RetOk, "0")
 }
 
+// Returns 1 if file is of requested type, 0 if not.
+func fileExists(t *tcl.Tcl, args []string) int { // name
+	if len(args) > 3 {
+		return t.SetResult(tcl.RetError, "file "+args[1]+" name")
+	}
+	_, err := os.Lstat(args[2])
+	if err != nil {
+		if os.IsNotExist(err) {
+			return t.SetResult(tcl.RetOk, "0")
+		}
+		return t.SetResult(tcl.RetError, err.Error())
+	}
+
+	return t.SetResult(tcl.RetOk, "1")
+}
+
 // Join parts of a name with system delimiter.
 func fileJoin(t *tcl.Tcl, args []string) int { // name name?
 	// filepath.Join
@@ -310,9 +316,8 @@ func fileJoin(t *tcl.Tcl, args []string) int { // name name?
 	for _, n := range args[2:] {
 		if n[0] == filepath.Separator {
 			dirPath = []string{}
-		} else {
-			dirPath = append(dirPath, n)
 		}
+		dirPath = append(dirPath, n)
 	}
 	if len(dirPath) == 0 {
 		return t.SetResult(tcl.RetOk, "")
@@ -353,7 +358,6 @@ func fileMkdir(t *tcl.Tcl, args []string) int { //  dir?
 	i := 2
 
 	for len(args) > i {
-		fmt.Println("mkdir ", len(args), i, args[i])
 		err := os.Mkdir(args[i], 0o750)
 		if err != nil {
 			return t.SetResult(tcl.RetError, err.Error())
@@ -430,7 +434,6 @@ func fileRename(t *tcl.Tcl, args []string) int { // -force -- source target
 	}
 
 	for len(args) > (i + 1) {
-		fmt.Println("rename ", target, len(args), i, args[i])
 		if dir {
 			err = os.Rename(args[i], target+string(os.PathSeparator)+filepath.Base(args[i]))
 		} else {
