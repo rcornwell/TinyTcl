@@ -33,7 +33,7 @@ import (
 	"strings"
 
 	"github.com/peterh/liner"
-	//expect "github.com/rcornwell/tinyTCL/expect"
+	expect "github.com/rcornwell/tinyTCL/expect"
 	tcl "github.com/rcornwell/tinyTCL/tcl"
 	file "github.com/rcornwell/tinyTCL/tclfile"
 )
@@ -49,7 +49,7 @@ func main() {
 	file.Init(tinyTcl)
 
 	// Add in expect commands.
-	//expect.Init(tinyTcl)
+	expect.Init(tinyTcl)
 
 	// If any arguments given, try to open the first one as a TCL file.
 	if len(os.Args) > 2 {
