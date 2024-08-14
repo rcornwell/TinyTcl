@@ -39,7 +39,7 @@ type tclFileData struct {
 }
 
 // Register commands.
-func FileInit(t *tcl.Tcl) {
+func Init(t *tcl.Tcl) {
 	t.Register("close", cmdClose)
 	t.Register("eof", cmdEOF)
 	t.Register("file", cmdFile)

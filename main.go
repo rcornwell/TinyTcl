@@ -1,5 +1,5 @@
 /*
- * TCL main test excuter.
+ * TCL example interactive/script runner.
  *
  * Copyright 2024, Richard Cornwell
  *
@@ -29,10 +29,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/peterh/liner"
-	//	expect "github.com/rcornwell/tinyTCL/expect"
+	//expect "github.com/rcornwell/tinyTCL/expect"
 	tcl "github.com/rcornwell/tinyTCL/tcl"
 	file "github.com/rcornwell/tinyTCL/tclfile"
 )
@@ -45,10 +46,10 @@ func main() {
 	tinyTcl.SetVarValue("argv", "")
 
 	// Add in file commands.
-	file.FileInit(tinyTcl)
+	file.Init(tinyTcl)
 
 	// Add in expect commands.
-	// expect.ExcpectInit(tinyTcl)
+	//expect.Init(tinyTcl)
 
 	// If any arguments given, try to open the first one as a TCL file.
 	if len(os.Args) > 2 {
@@ -70,8 +71,17 @@ func main() {
 
 	Line := liner.NewLiner()
 	defer Line.Close()
-	Line.SetCtrlCAborts(true)
+	Line.SetCtrlCAborts(false)
 	Line.SetMultiLineMode(true)
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt)
+	go func() {
+		<-done
+		Line.Close()
+		fmt.Println("^C abort")
+		os.Exit(0)
+	}()
 
 outer:
 	for {
@@ -87,9 +97,10 @@ outer:
 			}
 			if err != nil {
 				if errors.Is(err, liner.ErrPromptAborted) {
-					break outer
+					fmt.Println("^C")
+				} else {
+					fmt.Println(err.Error())
 				}
-				fmt.Println(err.Error())
 				break outer
 			}
 			if line == "" {

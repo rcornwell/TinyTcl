@@ -90,7 +90,7 @@ func TestFileOps(t *testing.T) {
 
 	for _, test := range testCases {
 		tc := tcl.NewTCL()
-		FileInit(tc)
+		Init(tc)
 		ret := tc.EvalString(test.test)
 		switch test.res {
 		case tcl.RetOk:
@@ -157,7 +157,7 @@ func TestFileRead(t *testing.T) {
 
 	for _, test := range testCases {
 		tc := tcl.NewTCL()
-		FileInit(tc)
+		Init(tc)
 		ret := tc.EvalString(test.test)
 		switch test.res {
 		case tcl.RetOk:
@@ -198,7 +198,7 @@ func TestFileWrite(t *testing.T) {
 	}
 
 	tc := tcl.NewTCL()
-	FileInit(tc)
+	Init(tc)
 	ret := tc.EvalString("file cwd " + tmp + "; set fd [open " + name + " w]")
 	if ret != nil {
 		t.Error("Unable to create file '", ret, "' ", name, "' ", tmp)
@@ -300,7 +300,7 @@ func TestFileWrite(t *testing.T) {
 	}
 
 	tc2 := tcl.NewTCL()
-	FileInit(tc2)
+	Init(tc2)
 	ret = tc2.EvalString("source " + name)
 	if ret != nil {
 		t.Error("Unable to source file " + name)
