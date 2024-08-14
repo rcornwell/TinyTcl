@@ -73,21 +73,29 @@ func stringCompare(tcl *Tcl, args []string) int {
 	}
 
 	i := 2
+outer:
 	for ; i < len(args); i++ {
-		if args[i] == "-nocase" {
+		switch args[i] {
+		case "-nocase":
 			nocase = true
-		} else if args[i] == "-length" {
+		case "-length":
 			i++
+			if i >= len(args) {
+				return tcl.SetResult(RetError, "missing length argument")
+			}
 			l, _, ok := ConvertStringToNumber(args[i], 10, 0)
 			if !ok {
 				return tcl.SetResult(RetError, "count")
 			}
 			length = l
-		} else {
-			break
+		default:
+			break outer
 		}
 	}
 
+	if i >= len(args) {
+		return tcl.SetResult(RetError, "Missing string")
+	}
 	// Trim strings to correct length.
 	str1 := args[i]
 
@@ -95,7 +103,11 @@ func stringCompare(tcl *Tcl, args []string) int {
 		str1 = str1[:min(length, len(str1))]
 	}
 
-	str2 := args[i+1]
+	i++
+	if i >= len(args) {
+		return tcl.SetResult(RetError, "Missing string")
+	}
+	str2 := args[i]
 	if length >= 0 {
 		str2 = str2[:min(length, len(str2))]
 	}

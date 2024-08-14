@@ -63,14 +63,14 @@ func UnEscape(str string) (string, int) {
 	for pos := 0; pos < len(str); pos++ {
 		ch := str[pos]
 		if inOctal {
-			if digits != 3 && ch >= '0' && ch <= '7' {
+			if digits < 3 && ch >= '0' && ch <= '7' {
 				num = (num << 3) + int(ch-'0')
 				digits++
-			} else {
-				inOctal = false
-				digits = 0
-				result += string(rune(num))
+				continue
 			}
+			inOctal = false
+			digits = 0
+			result += string(rune(num))
 		}
 
 		if inEscape {
@@ -78,22 +78,31 @@ func UnEscape(str string) (string, int) {
 			case '\n': // Multiline
 			case '\\':
 				result += "\\"
+
 			case 'a':
 				result += "\a"
+
 			case 'b':
 				result += "\b"
+
 			case 'e':
 				result += "\033"
+
 			case 'f':
 				result += "\f"
+
 			case 'n':
 				result += "\n"
+
 			case 'r':
 				result += "\r"
+
 			case 't':
 				result += "\t"
+
 			case 'v':
 				result += "\v"
+
 			case 'x':
 				if (pos + 1) > len(str) {
 					return "", -2
@@ -106,8 +115,11 @@ func UnEscape(str string) (string, int) {
 					result += string(val)
 					pos += n
 				}
+
 			case '0':
 				inOctal = true
+				num = 0
+
 			default:
 				result += string(ch)
 			}
@@ -119,6 +131,10 @@ func UnEscape(str string) (string, int) {
 				result += string(ch)
 			}
 		}
+	}
+
+	if digits > 0 {
+		result += string(rune(num))
 	}
 	return result, 0
 }

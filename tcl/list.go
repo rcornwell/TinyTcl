@@ -288,8 +288,11 @@ outer:
 		case "-integer":
 			integer = true
 		case "-command":
-			command = args[i+1]
 			i++
+			if i >= len(args) {
+				return tcl.SetResult(RetError, "missing command argument")
+			}
+			command = args[i]
 		default:
 			break outer
 		}
@@ -354,12 +357,15 @@ outer:
 			inline = true
 		case "-sorted": // Ignored for now.
 		case "-start":
-			s, _, ok := ConvertStringToNumber(args[i+1], 10, 0)
+			i++
+			if i >= len(args) {
+				return tcl.SetResult(RetError, "missing argument for start")
+			}
+			s, _, ok := ConvertStringToNumber(args[i], 10, 0)
 			if !ok {
 				return tcl.SetResult(RetError, "start option not a number")
 			}
 			start = s
-			i++
 		default:
 			break outer
 		}

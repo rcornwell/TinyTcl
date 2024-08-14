@@ -115,6 +115,11 @@ func (tcl *Tcl) EvalString(str string) error {
 	return ErrError
 }
 
+// Used by extensions to evaluate an express and get return value.
+func (tcl *Tcl) Eval(str string) int {
+	return tcl.eval(str, parserOptions{})
+}
+
 // Evaluate a TCL expression.
 func (tcl *Tcl) eval(str string, opts parserOptions) int {
 	tcl.result = ""

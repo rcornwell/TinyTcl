@@ -70,7 +70,7 @@ func (tcl *Tcl) tclInitCommands() {
 	tcl.Register("set", cmdSet)
 	tcl.Register("split", cmdSplit)
 	tcl.Register("string", cmdString)
-	tcl.Register("subst", cmdSubstr)
+	tcl.Register("subst", cmdSubst)
 	tcl.Register("switch", cmdSwitch)
 	// tcl.Register("uplevel", cmdUpLevel)
 	tcl.Register("upvar", cmdUpVar)
@@ -129,11 +129,9 @@ func cmdUnSet(tcl *Tcl, args []string) int {
 }
 
 // Substitute variables in arguments.
-func cmdSubstr(tcl *Tcl, args []string) int {
+func cmdSubst(tcl *Tcl, args []string) int {
 	opts := parserOptions{noEval: true, subst: true}
-	str := ""
-	done := false
-	for i := 1; i < len(args) && !done; i++ {
+	for i := 1; i < len(args); i++ {
 		switch args[i] {
 		case "-nobacklashes":
 			opts.noEscapes = true
@@ -142,11 +140,10 @@ func cmdSubstr(tcl *Tcl, args []string) int {
 		case "-nocommands":
 			opts.noCommands = true
 		default:
-			str = args[i]
-			done = true
+			return tcl.eval(args[i], opts)
 		}
 	}
-	return tcl.eval(str, opts)
+	return tcl.SetResult(RetError, "subst string")
 }
 
 // Print a string to standard output.
@@ -443,10 +440,10 @@ func cmdFor(tcl *Tcl, args []string) int {
 // Process switch statement.
 func cmdSwitch(tcl *Tcl, args []string) int {
 	exact := true
-	done := false
 	regexpr := false
-	arg := 1
-	for i := 1; i < len(args) && !done; i++ {
+	i := 1
+outer:
+	for ; i < len(args); i++ {
 		switch args[i] {
 		case "-exact":
 			exact = true
@@ -457,20 +454,27 @@ func cmdSwitch(tcl *Tcl, args []string) int {
 		case "-regexp":
 			regexpr = true
 		case "--":
-			arg = i + 1
-			done = true
+			i++
+			break outer
 		default:
-			arg = i
-			done = true
+			break outer
 		}
 	}
-	str := args[arg]
-	arg++
-	matchList := args[arg:]
-	// If at last element of string.
-	if len(matchList) == 1 {
-		matchList = tcl.ParseArgs(matchList[0])
+	if i >= len(args) {
+		return tcl.SetResult(RetError, "switch body")
 	}
+	str := args[i]
+	var matchList []string
+	i++
+	// If at last element of string.
+	if (i + 1) == len(args) {
+		matchList = tcl.ParseArgs(args[i])
+	} else if (i + 2) < len(args) {
+		matchList = args[i:]
+	} else {
+		return tcl.SetResult(RetError, "switch body")
+	}
+
 	// Scan list in pairs.
 	for i := 0; i < len(matchList); i += 2 {
 		if matchList[i] == "default" {
@@ -497,7 +501,7 @@ func cmdSwitch(tcl *Tcl, args []string) int {
 		}
 		if match {
 			// If body is "-", use next body.
-			for matchList[i+1] == "-" && i <= len(matchList) {
+			for i <= len(matchList) && matchList[i+1] == "-" {
 				i += 2
 			}
 			return tcl.eval(matchList[i+1], parserOptions{})
