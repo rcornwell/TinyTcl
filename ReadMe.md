@@ -83,7 +83,7 @@ Extensions that need to hold data to be passed to various commands can create a 
 	data := tclExtData{}
 	tcl.Data["exten"] = &data
 
-In a command proceedure this can be accessed by:
+In a command procedure this can be accessed by:
 
 	data, ok := t.Data["exten"].(*tclExtData)
 	if !ok {
