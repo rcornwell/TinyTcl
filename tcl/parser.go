@@ -232,6 +232,7 @@ func (p *parser) isVarChar() bool {
 
 // Collect variable. Start on $.
 func (p *parser) parseVar() bool {
+	spos := p.pos // Save starting position.
 	brace := false
 	p.next()
 
@@ -240,22 +241,24 @@ func (p *parser) parseVar() bool {
 		brace = true
 	}
 
-	p.start = p.pos
+	p.start = p.pos // Grab all variable characters.
 	for p.isVarChar() {
 		p.next()
 	}
 	p.end = p.pos
-	if brace {
+
+	if p.start == p.end { // $ does not have following name.
+		p.start = spos
+		p.token = tokString
+		return true
+	}
+
+	if brace { // If brace, make sure trailing brace.
 		if p.char != '}' {
 			return false
 		}
 	}
-	if !brace && p.start == p.pos { // Just single character string "$"
-		p.start = p.pos
-		p.token = tokString
-	} else {
-		p.token = tokVar
-	}
+	p.token = tokVar
 	return true
 }
 
@@ -302,7 +305,7 @@ func (p *parser) parseString() bool {
 	}
 
 	// Start of word, and ", signal we are in "string", get next char.
-	if newWord && p.char == '"' {
+	if newWord && !p.inQuote && p.char == '"' {
 		p.inQuote = true
 		p.next()
 	}
@@ -322,7 +325,7 @@ func (p *parser) parseString() bool {
 			}
 
 		case '$':
-			// If pressing variables, everything up to $.
+			// If processing variables, everything up to $.
 			if !p.options.noVars {
 				p.end = p.pos
 				p.token = tokEscape
