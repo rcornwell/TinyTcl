@@ -26,8 +26,11 @@
 package expect
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	tcl "github.com/rcornwell/tinyTCL/tcl"
 )
@@ -52,65 +55,27 @@ type matchList struct {
 	nobuffer bool   // Don't buffer matches for this pattern.
 }
 
-//  func cmdExpect(t *tcl.Tcl, _ []string) int {
-// 	 ok, spawnID := t.GetVarValue("spawn_id")
-// 	 if ok != tcl.RetOk {
-// 		 return t.SetResult(tcl.RetError, "spawn_id variable not defined")
-// 	 }
-// 	 expect, eok := t.Data["expect"].(*expectData)
-// 	 if !eok {
-// 		 panic("invalid data type expect extension")
-// 	 }
-
-// 	 proc, sok := expect.processes[spawnID]
-// 	 if !sok {
-// 		 return t.SetResult(tcl.RetError, "no process of name "+spawnID)
-// 	 }
-
-// 	 proc.matching = true
-
-// 	 proc.rdr.startReader(nil)
-// 	 proc.matching = true
-// 	 defer func() { proc.matching = false }()
-
-// 	 // ml := []matchList{}
-// 	 // patterns := []string{}
-// 	 // // Build match patterns.
-// 	 // if len(args) == 2 {
-// 	 // 	patterns = tcl.NewTCL().ParseArgs(args[1])
-// 	 // } else {
-// 	 // 	patterns = args[1:]
-// 	 // }
-// 	 defer proc.rdr.stopReader()
-// 	 for {
-// 		 //	by, err := stdin.read()
-// 		 input := make([]byte, 1)
-// 		 _, err := os.Stdin.Read(input)
-// 		 if err != nil {
-// 			 return t.SetResult(tcl.RetError, "expect read "+err.Error())
-// 		 }
-// 		 if input[0] == '\001' {
-// 			 break
-// 		 }
-// 		 //	proc.pty.Write(input)
-// 		 // _, err = proc.stdin.Write([]byte{by})
-// 		 //	_, err = os.Stdout.Write([]byte{by})
-// 		 // if err != nil {
-// 		 // 	stdin.stopReader()
-// 		 // 	return t.SetResult(tcl.RetError, "write: "+err.Error())
-// 		 // }
-// 	 }
-// 	 return t.SetResult(tcl.RetOk, "")
-//  }
-
+// Scan match list and generate list of match patterns.
 func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 	mlin := []*matchList{}
 	mlout := []*matchList{}
 	match := &matchList{}
+	timeout := false
 	output := !input
 	body := false
 	fmt.Println(patterns)
 	for _, v := range patterns {
+		// For interact, timeout can have optional timeout value.
+		if input && timeout {
+			t, _, ok := tcl.ConvertStringToNumber(v, 10, 0)
+			if ok {
+				match.bpos = t
+				timeout = false
+				continue
+			}
+		}
+
+		// If got pattern, next should be body.
 		if body {
 			match.body = v
 			match = &matchList{}
@@ -118,6 +83,7 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 			continue
 		}
 
+		// Not body, see if minus option.
 		if !match.exact {
 			switch v {
 			case "-o":
@@ -146,22 +112,27 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 				match.nocase = true
 				continue
 
-			case "-timeout":
 			default:
 			}
 		}
 
+		// If not exact match see if special pattern.
 		if !match.exact {
 			switch v {
-			case "timeout", "eof", "default":
-				match.str = v
+			case "timeout":
+				if input {
+					timeout = true
+				}
 				match.cmd = true
-				body = true
-				continue
+			case "eof", "default", "full_buffer":
+				match.cmd = true
 			}
 		}
 
-		//	fmt.Printf(" match %02x %s\n", v[0], v)
+		// Put new pattern into correct list.
+		if match.nocase {
+			v = strings.ToLower(v)
+		}
 		match.str = v
 		if output {
 			mlout = append(mlout, match)
@@ -174,62 +145,7 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 	return mlin, mlout
 }
 
-// 	 proc.matchPats = mlout
-// 	 proc.matching = true
-// 	 proc.matchData.matchBuffer = ""
-// 	 proc.matchData.matchLen = -1
-// 	 defer func() { proc.matching = false }()
-// 	 mbuf := matchBuffer{matchLen: -1, matchMax: 2000}
-
-// 	 if proc.last != 0 {
-// 		 ret, _ := process(proc, proc.last, nil)
-// 		 if ret != tcl.RetOk {
-// 			 return t.SetResult(ret, "")
-// 		 }
-// 		 proc.last = 0
-// 	 }
-
-// 	 proc.rdr.startReader(os.Stdin)
-// 	 defer proc.rdr.stopReader()
-// 	 for {
-// 		 ret, by, err := proc.rdr.read()
-// 		 if err != nil {
-// 			 return t.SetResult(tcl.RetError, "read "+err.Error())
-// 		 }
-// 		 if ret >= 0 {
-// 			 switch ret {
-// 			 case tcl.RetError:
-// 				 return t.SetResult(tcl.RetError, "read error")
-// 			 case tcl.RetBreak:
-// 			 case tcl.RetReturn:
-// 			 case tcl.RetContinue:
-// 			 }
-// 			 continue
-// 		 }
-
-// 		 fmt.Println("read: " + string(by))
-// 		 appendMatch(mlin, &mbuf, by)
-// 		 r, m := match(t, mlin, &mbuf)
-// 		 switch r {
-// 		 case tcl.RetOk:
-// 		 case tcl.RetError, tcl.RetBreak, tcl.RetContinue, tcl.RetReturn:
-// 			 return t.SetResult(r, "")
-// 		 }
-// 		 if by == '\001' {
-// 			 break
-// 		 }
-// 		 if !m {
-// 			 _, err = proc.pty.Write([]byte{by})
-// 		 }
-// 		 //_, err = proc.stdin.Write([]byte{by})
-// 		 //	_, err = os.Stdout.Write([]byte{by})
-// 		 if err != nil {
-// 			 return t.SetResult(tcl.RetError, "write: "+err.Error())
-// 		 }
-// 	 }
-// 	 return t.SetResult(tcl.RetOk, "")
-//  }
-
+// Append a bunch of text to a input buffer.
 func appendMatch(ml []*matchList, mbuf *matchBuffer, by []byte) {
 	mbuf.matchBuffer += string(by)
 	mbuf.Length += len(by)
@@ -249,6 +165,7 @@ func appendMatch(ml []*matchList, mbuf *matchBuffer, by []byte) {
 	}
 }
 
+// When we get a match shift input buffer to position.
 func moveBuffer(ml []*matchList, mbuf *matchBuffer, pos int) {
 	mbuf.matchBuffer = mbuf.matchBuffer[pos:]
 	mbuf.Length = len(mbuf.matchBuffer)
@@ -258,28 +175,34 @@ func moveBuffer(ml []*matchList, mbuf *matchBuffer, pos int) {
 	}
 }
 
+// Attempt to find a match in current buffer.
 func match(t *tcl.Tcl, ml []*matchList, mbuf *matchBuffer) (int, bool) {
-	//	fmt.Println("match " + mbuf.matchBuffer)
-	// Character to match against.
-
 	m := false
 	did := true
+	// Continue to loop while there was at least one match.
 	for did {
 		did = false
 
+		// Check each pattern.
 		for i := range ml {
-			if ml[i].cmd {
-				continue
-			}
-			if ml[i].mpos >= mbuf.Length {
-				//			fmt.Printf("Skip %d %d %d\n", ml[i].mpos, mbuf.Length, i)
+			// If this is command, or match position past end of buffer,
+			// skip this pattern.
+			if ml[i].cmd || ml[i].mpos > mbuf.Length {
+				fmt.Printf("Skip %d %d %d\n", ml[i].mpos, mbuf.Length, i)
 				continue
 			}
 			did = true
+			// if ml[i].glob {
+			// 	mstr := mbuf.matchBuffer[ml[i].mpos:]
+			// 	r := tcl.Match(ml[i].str, mstr, ml[i].nocase, len(mstr))
+			// }
 			by := mbuf.matchBuffer[ml[i].mpos]
+			if ml[i].nocase {
+				by = byte(strings.ToLower(string(by))[0])
+			}
 			ml[i].mpos++
 			match := ml[i].str[ml[i].bpos]
-			//		fmt.Printf("check %d %d %d %d %02x %02x\n", ml[i].mpos, ml[i].bpos, mbuf.Length, i, by, match)
+			fmt.Printf("check %d %d %d %d %02x %02x\n", ml[i].mpos, ml[i].bpos, mbuf.Length, i, by, match)
 			if match == by {
 				ml[i].bpos++
 				if ml[i].bpos == len(ml[i].str) {
@@ -302,16 +225,49 @@ func match(t *tcl.Tcl, ml []*matchList, mbuf *matchBuffer) (int, bool) {
 	return -1, m
 }
 
-func process(proc *expectProcess, input []byte, err error) (int, bool) {
-	if err != nil {
-		// treat as end of file.
-		return tcl.RetExit, true
+// Match special patterns.
+func matchSpecial(t *tcl.Tcl, ml []*matchList, str string) int {
+	fmt.Println("Special " + str)
+	for i := range ml {
+		if ml[i].cmd {
+			if ml[i].str == str || ml[i].str == "default" {
+				if ml[i].body != "" {
+					return t.Eval(ml[i].body)
+				}
+				break
+			}
+		}
 	}
+
+	return ExpEnd
+}
+
+// Find any timeout values in match list.
+func getTimeout(ml []*matchList) int {
+	for i := range ml {
+		if ml[i].cmd && ml[i].str == "timeout" {
+			return ml[i].bpos
+		}
+	}
+	return -1
+}
+
+// Process input from remote system.
+func processRemote(proc *expectProcess, input []byte, err error) (int, bool) {
+	if errors.Is(err, io.EOF) {
+		return matchSpecial(proc.tcl, proc.matchPats, "eof"), true
+	}
+
+	if err != nil {
+		return tcl.RetError, false
+	}
+
 	if proc.matching {
 		appendMatch(proc.matchPats, &proc.matchData, input)
 		r, _ := match(proc.tcl, proc.matchPats, &proc.matchData)
 		return r, false
 	}
+
 	proc.last = append(proc.last, input...)
 	return tcl.RetOk, false
 }
