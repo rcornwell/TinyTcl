@@ -83,6 +83,7 @@ func main() {
 		os.Exit(0)
 	}()
 
+	exit := 0
 outer:
 	for {
 		multi := true
@@ -118,6 +119,10 @@ outer:
 		err := tinyTcl.EvalString(command)
 		if err != nil {
 			if errors.Is(err, tcl.ErrExit) {
+				e, _, ok := tcl.ConvertStringToNumber(tinyTcl.GetResult(), 10, 0)
+				if ok {
+					exit = e
+				}
 				break
 			} else {
 				fmt.Println("Error: " + tinyTcl.GetResult())
@@ -126,4 +131,6 @@ outer:
 			fmt.Println("=> " + tinyTcl.GetResult())
 		}
 	}
+	Line.Close()
+	os.Exit(exit)
 }

@@ -43,7 +43,7 @@ func (tcl *Tcl) tclInitCommands() {
 	tcl.Register("eq", cmdEqual)
 	tcl.Register("error", cmdError)
 	tcl.Register("eval", cmdEval)
-	tcl.Register("exit", func(_ *Tcl, _ []string) int { return RetExit })
+	tcl.Register("exit", cmdExit)
 	tcl.Register("expr", cmdMath)
 	tcl.Register("for", cmdFor)
 	tcl.Register("foreach", cmdForEach)
@@ -351,6 +351,14 @@ func cmdIf(tcl *Tcl, args []string) int {
 		}
 	}
 	return r
+}
+
+// Handle simple control flow commands.
+func cmdExit(tcl *Tcl, args []string) int {
+	if len(args) == 1 {
+		return tcl.SetResult(RetExit, "0")
+	}
+	return tcl.SetResult(RetExit, args[1])
 }
 
 // Handle simple control flow commands.
