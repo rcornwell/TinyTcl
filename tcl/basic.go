@@ -156,7 +156,6 @@ func cmdPuts(tcl *Tcl, args []string) int {
 // Run a user process.
 func userProc(tcl *Tcl, args []string, params string, body string) int {
 	newenv := tcl.newEnv()
-	param := ""
 	// Current argument number.
 	argNum := 1
 
@@ -167,7 +166,7 @@ func userProc(tcl *Tcl, args []string, params string, body string) int {
 				break
 			}
 			if name == "args" && i == len(argList) {
-				tcl.setVarNewEnv(newenv, param, strings.Join(args[argNum:], " "), true)
+				tcl.setVarNewEnv(newenv, "args", strings.Join(args[argNum:], " "), true)
 				break
 			}
 			tcl.setVarNewEnv(newenv, name, args[argNum], true)
@@ -475,11 +474,12 @@ outer:
 	var matchList []string
 	i++
 	// If at last element of string.
-	if (i + 1) == len(args) {
+	switch {
+	case (i + 1) == len(args):
 		matchList = tcl.ParseArgs(args[i])
-	} else if (i + 2) < len(args) {
+	case (i + 2) < len(args):
 		matchList = args[i:]
-	} else {
+	default:
 		return tcl.SetResult(RetError, "switch body")
 	}
 
@@ -518,6 +518,119 @@ outer:
 	return tcl.SetResult(RetOk, "")
 }
 
+var relationOprs = map[string]bool{
+	">":  true,
+	">=": true,
+	"<":  true,
+	"<=": true,
+	"==": true,
+	"!=": true,
+}
+
+func stringCmp(tcl *Tcl, args []string) int {
+	cmp := strings.Compare(args[1], args[3])
+	ret := "0"
+	switch args[2] {
+	case ">":
+		if cmp > 0 {
+			ret = "1"
+		}
+	case ">=":
+		if cmp >= 0 {
+			ret = "1"
+		}
+
+	case "<":
+		if cmp < 0 {
+			ret = "1"
+		}
+	case "<=":
+		if cmp <= 0 {
+			ret = "1"
+		}
+	case "==":
+		if cmp == 0 {
+			ret = "1"
+		}
+	case "!=":
+		if cmp != 0 {
+			ret = "1"
+		}
+	default:
+	}
+	return tcl.SetResult(RetOk, ret)
+}
+
+// Compute binary operation.
+func binaryOp(tcl *Tcl, opr string, aval int, bval int) int {
+	switch opr {
+	case "+":
+		aval += bval
+	case "-":
+		aval -= bval
+	case "*":
+		aval *= bval
+	case "/":
+		aval /= bval
+	case "and":
+		aval &= bval
+	case "or":
+		aval |= bval
+	case "xor":
+		aval ^= bval
+	case "max":
+		if aval < bval {
+			aval = bval
+		}
+	case "min":
+		if aval > bval {
+			aval = bval
+		}
+	case ">":
+		if aval > bval {
+			aval = 1
+		} else {
+			aval = 0
+		}
+	case ">=":
+		if aval >= bval {
+			aval = 1
+		} else {
+			aval = 0
+		}
+
+	case "<":
+		if aval < bval {
+			aval = 1
+		} else {
+			aval = 0
+		}
+	case "<=":
+		if aval <= bval {
+			aval = 1
+		} else {
+			aval = 0
+		}
+	case "==":
+		if aval == bval {
+			aval = 1
+		} else {
+			aval = 0
+		}
+	case "!=":
+		if aval != bval {
+			aval = 1
+		} else {
+			aval = 0
+		}
+	default:
+		return tcl.SetResult(RetError, "invalid operator")
+	}
+
+	// Convert result back to string.
+	return tcl.SetResult(RetOk, ConvertNumberToString(aval, 10))
+}
+
 // Handle expr command.
 func cmdMath(tcl *Tcl, args []string) int {
 	// Join all arguments amd scan them ourselves.
@@ -534,6 +647,10 @@ func cmdMath(tcl *Tcl, args []string) int {
 	// Try to convert first item to number.
 	aval, pos, binary := ConvertStringToNumber(str, 10, 0)
 	bval := 0
+
+	if !binary && len(args) == 4 && relationOprs[args[2]] {
+		return stringCmp(tcl, args)
+	}
 
 	// Skip space.
 	for pos < len(str) {
@@ -565,98 +682,39 @@ func cmdMath(tcl *Tcl, args []string) int {
 	// Convert 2nd or 3rd as number.
 	v, _, ok := ConvertStringToNumber(tcl.result, 10, pos)
 	if !ok {
+		if len(args) == 4 && relationOprs[args[2]] {
+			return stringCmp(tcl, args)
+		}
+
 		return tcl.SetResult(RetError, "not a number")
 	}
 	bval = v
 
 	if binary {
-		switch opr {
-		case "+":
-			aval += bval
-		case "-":
-			aval -= bval
-		case "*":
-			aval *= bval
-		case "/":
-			aval /= bval
-		case "and":
-			aval &= bval
-		case "or":
-			aval |= bval
-		case "xor":
-			aval ^= bval
-		case "max":
-			if aval < bval {
-				aval = bval
-			}
-		case "min":
-			if aval > bval {
-				aval = bval
-			}
-		case ">":
-			if aval > bval {
-				aval = 1
-			} else {
-				aval = 0
-			}
-		case ">=":
-			if aval >= bval {
-				aval = 1
-			} else {
-				aval = 0
-			}
-
-		case "<":
-			if aval < bval {
-				aval = 1
-			} else {
-				aval = 0
-			}
-		case "<=":
-			if aval <= bval {
-				aval = 1
-			} else {
-				aval = 0
-			}
-		case "==":
-			if aval == bval {
-				aval = 1
-			} else {
-				aval = 0
-			}
-		case "!=":
-			if aval != bval {
-				aval = 1
-			} else {
-				aval = 0
-			}
-		default:
-			return tcl.SetResult(RetError, "invalid operator")
+		return binaryOp(tcl, opr, aval, bval)
+	}
+	switch opr {
+	case "-", "neg":
+		aval = -bval
+	case "not":
+		if bval == 0 {
+			aval = 1
+		} else {
+			aval = 0
 		}
-	} else {
-		switch opr {
-		case "-", "neg":
-			aval = -bval
-		case "not":
-			if bval == 0 {
-				aval = 1
-			} else {
-				aval = 0
-			}
-		case "inv":
-			aval = ^bval
-		case "abs":
-			if bval < 0 {
-				aval = -aval
-			}
-		case "bool":
-			if bval != 0 {
-				aval = 1
-			}
-		case "+", "":
-		default:
-			return tcl.SetResult(RetError, "invalid operator")
+	case "inv":
+		aval = ^bval
+	case "abs":
+		if bval < 0 {
+			aval = -aval
 		}
+	case "bool":
+		if bval != 0 {
+			aval = 1
+		}
+	case "+", "":
+	default:
+		return tcl.SetResult(RetError, "invalid operator")
 	}
 
 	// Convert result back to string.
@@ -758,7 +816,7 @@ func cmdAppend(tcl *Tcl, args []string) int {
 // Compare two arguments as strings.
 func cmdEqual(tcl *Tcl, args []string) int {
 	if len(args) != 3 {
-		tcl.result = "equal a b"
+		tcl.result = "eq a b"
 		return RetError
 	}
 	if args[1] == args[2] {
@@ -772,7 +830,7 @@ func cmdEqual(tcl *Tcl, args []string) int {
 // Compare two arguments as strings.
 func cmdNotEqual(tcl *Tcl, args []string) int {
 	if len(args) != 3 {
-		tcl.result = "equal a b"
+		tcl.result = "ne a b"
 		return RetError
 	}
 	if args[1] != args[2] {
