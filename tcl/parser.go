@@ -80,7 +80,7 @@ func (p *parser) getToken() bool {
 			if p.inQuote {
 				return p.parseString()
 			}
-			return p.parseEol()
+			return p.parseEOL()
 
 		case '[':
 			r := p.parseCommand()
@@ -168,7 +168,7 @@ func (p *parser) parseSeparator() bool {
 }
 
 // Scan end of line.
-func (p *parser) parseEol() bool {
+func (p *parser) parseEOL() bool {
 	p.start = p.pos
 	for p.parseIsSpace() || p.char == ';' {
 		p.next()

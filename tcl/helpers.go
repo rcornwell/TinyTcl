@@ -225,7 +225,7 @@ func ConvertNumberToString(num int, base int) string {
 		return result
 	}
 
-	// Preappend digits to number.
+	// Prepends digits to number.
 	for num != 0 {
 		d := num % base
 		result = string(hex[d]) + result

@@ -75,7 +75,6 @@ func main() {
 	}
 
 	Line := liner.NewLiner()
-	defer Line.Close()
 	Line.SetCtrlCAborts(false)
 	Line.SetMultiLineMode(true)
 
@@ -129,9 +128,8 @@ outer:
 					exit = e
 				}
 				break
-			} else {
-				fmt.Println("Error: " + tinyTcl.GetResult())
 			}
+			fmt.Println("Error: " + tinyTcl.GetResult())
 		} else if tinyTcl.GetResult() != "" {
 			fmt.Println("=> " + tinyTcl.GetResult())
 		}
