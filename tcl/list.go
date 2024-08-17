@@ -315,8 +315,7 @@ outer:
 		}
 		list[k+1] = key
 	}
-	list = append([]string{"list"}, list...)
-	return cmdList(tcl, list)
+	return cmdList(tcl, append([]string{"list"}, list...))
 }
 
 const (
@@ -334,6 +333,7 @@ func cmdLSearch(tcl *Tcl, args []string) int {
 	nocase := false
 	not := false
 	start := 0
+	sort := false
 
 	i := 1
 outer:
@@ -355,7 +355,8 @@ outer:
 			nocase = true
 		case "-inline":
 			inline = true
-		case "-sorted": // Ignored for now.
+		case "-sorted":
+			sort = true
 		case "-start":
 			i++
 			if i >= len(args) {
@@ -383,7 +384,7 @@ outer:
 		}
 		imatch = m
 	}
-	result := []string{"list"}
+	result := []string{}
 matchLoop:
 	for i := start; i < len(list); i++ {
 		value := list[i]
@@ -431,11 +432,33 @@ matchLoop:
 		}
 	}
 
-	if len(result) == 1 {
-		result = append(result, "-1")
+	if len(result) == 0 {
+		return tcl.SetResult(RetOk, "-1")
 	}
 
-	return cmdList(tcl, result)
+	// Sort result if asked for.
+	// If not inline, then indices will always be in order.
+	if sort && !inline {
+		k := 0
+		for j := 1; j < len(result); j++ {
+			key := result[j]
+			k = j - 1
+			for k >= 0 {
+				ord, err := tcl.order(op == opInteger, false, "", key, result[k])
+				if err != RetOk {
+					return err
+				}
+				if !ord {
+					break
+				}
+				result[k+1] = result[k]
+				k--
+			}
+			result[k+1] = key
+		}
+	}
+
+	return cmdList(tcl, append([]string{"list"}, result...))
 }
 
 // Elements in a list.
@@ -456,11 +479,11 @@ func cmdLSet(tcl *Tcl, args []string) int {
 		return err
 	}
 
-	type stackelement struct {
+	type stackElement struct {
 		list  []string
 		index int
 	}
-	stack := []stackelement{}
+	stack := []stackElement{}
 	list := tcl.ParseArgs(setList)
 	// Scan the list, getting lists to replace and their index.
 	for i := 2; i < len(args)-1; i++ {
@@ -474,7 +497,7 @@ func cmdLSet(tcl *Tcl, args []string) int {
 			if i < 0 || i >= len(list) {
 				return tcl.SetResult(RetError, "list index out of range")
 			}
-			stack = append(stack, stackelement{list: list, index: i})
+			stack = append(stack, stackElement{list: list, index: i})
 			list = tcl.ParseArgs(list[i])
 			pos = npos
 		}
