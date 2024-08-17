@@ -110,11 +110,11 @@ be one of the following:
 
 - args procname      Returns the arguments to procname if procname exists.
 - body procname      Returns the body of procname if procname exists.
-- commands ?pattern  Returns a list of commands including proceedure.
+- commands ?pattern  Returns a list of commands including procedure.
                      If pattern given returns only the matching elements.
 - exists varName     Returns 1 if varName exists, 0 if not.
 - globals ?pattern   Returns a list of global variables. 
-- level number      Returns arguments for proceedure running at number.
+- level number      Returns arguments for procedure running at number.
 - local ?pattern    Returns local variable from current level.
 - procs ?pattern    Returns list of user defined procs.
 - vars ?pattern     Returns list of variables defined.
@@ -406,7 +406,7 @@ not given, returns to line read in.
 Opens a file, if no access is given the file is opened for reading. Access can be used
 to specify how to open the file. perms is optional and is used on creating a file to
 set access permissions. Default is (0o666). Access can be, r,r+,w,w+,a,a+. If + option
-is given then the file is opened read/write. Returns the name of the channel openned.
+is given then the file is opened read/write. Returns the name of the channel opened.
 
 #### read ?-nonewline channel numChars
 
@@ -508,7 +508,7 @@ Returns the current working directory.
 
 #### file separator
 
-Returns system specific file path separater.
+Returns system specific file path separate.
 
 #### file size name
 

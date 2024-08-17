@@ -38,6 +38,11 @@ import (
 	file "github.com/rcornwell/tinyTCL/tclfile"
 )
 
+// Example code to show how to open and evaluate a file.
+// Also how to run system interactive. Interactive operation
+// is mostly for testing. This is also an example of
+// how to set up an interpreter environment and run commands
+// on it.
 func main() {
 	// Create new TCL environment.
 	tinyTcl := tcl.NewTCL()
