@@ -240,9 +240,8 @@ func fileType(t *tcl.Tcl, args []string) int { // name
 	if err != nil {
 		if os.IsNotExist(err) {
 			return t.SetResult(tcl.RetError, "file "+args[2]+" does not exist")
-		} else {
-			return t.SetResult(tcl.RetError, err.Error())
 		}
+		return t.SetResult(tcl.RetError, err.Error())
 	}
 
 	switch args[1] {
