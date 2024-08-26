@@ -653,7 +653,7 @@ func matchPattern(list []string, pattern string) []string {
 
 	for _, n := range list {
 		r := Match(pattern, n, false, len(n))
-		if r == 1 {
+		if r > 0 {
 			res = append(res, n)
 		}
 	}

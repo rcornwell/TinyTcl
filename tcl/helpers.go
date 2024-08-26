@@ -342,7 +342,7 @@ outer:
 		switch pat[i] {
 		case '*': // Match any number of character.
 			r := Match(pat[i+1:], target[k:], nocase, depth-1)
-			if r != 0 {
+			if r > 0 {
 				return r
 			}
 			if k >= len(target) {
@@ -417,7 +417,7 @@ outer:
 			i++
 		}
 	}
-	return 1
+	return k
 }
 
 // Create new environment, used in user procs.
