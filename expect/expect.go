@@ -26,49 +26,27 @@
 package expect
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
+	"unicode"
 
 	pty "github.com/creack/pty"
 	tcl "github.com/rcornwell/tinyTCL/tcl"
 )
 
-// expect ?-re ?-gl ?-ex ?-nocase string
-// expect block
-// expect_user
-//  block is match action.
-// timeout
-// connected
-// eof
-// default   timeout|eof
-// action abort
-//
-// Variables.
-// expect_out#
-// timeout
-// spawn_id
-// send_human {time .1 second }
-//
-// expect_continue
-// connect ?-raw host ?port
-// spawn prog args => procid
-// send ?-null ?-break ?-s ?-h ?-i spawn_id string
-// send_error ...
-// send_log ... set to log_file.
-// send_user ...
-// disconnect/close -i spawn_id
-// sleep seconds
-// interact match action
-// log_file ?-open ?-leaveopen ?-noappend file
-// log_user 0|1
-// match_max ?-d ?-i spawn_id ?size
-
 const (
 	ExpContinue = iota + tcl.RetExit + 1
 	ExpEnd
+)
+
+const (
+	SendRemote = iota + 1
+	SendUser
+	SendLog
+	SendError
 )
 
 type expectProcess struct {
@@ -88,24 +66,42 @@ type expectProcess struct {
 
 type expectData struct {
 	processes  map[string]*expectProcess
-	spawnCount int // next spawn ID.
+	spawnCount int      // next spawn ID.
+	matchMax   int      // Maximum number of characters for match buffer.
+	logFile    *os.File // Logging file.
+	logUser    bool     // Log output to user.
+	logAll     bool     // Always log to user.
 }
 
 // Register commands.
-func Init(tcl *tcl.Tcl) {
-	tcl.Register("connect", cmdConnect)
-	tcl.Register("disconnect", cmdDisconnect)
-	tcl.Register("expect", cmdExpect)
-	tcl.Register("expect_continue", cmdExpectContinue)
-	tcl.Register("interact", cmdInteract)
-	tcl.Register("send", cmdSend)
-	tcl.Register("sleep", cmdSleep)
-	tcl.Register("spawn", cmdSpawn)
-	tcl.Register("wait", cmdWait)
-	tcl.SetVarValue("timeout", "-1")
+func Init(t *tcl.Tcl) {
+	t.Register("connect", cmdConnect)
+	t.Register("disconnect", cmdDisconnect)
+	t.Register("expect", cmdExpect)
+	t.Register("expect_continue", cmdExpectContinue)
+	t.Register("interact", cmdInteract)
+	t.Register("log_file", cmdLogFile)
+	t.Register("log_user", cmdLogUser)
+	t.Register("match_max", cmdMatchMax)
+	t.Register("send", func(t *tcl.Tcl, args []string) int {
+		return cmdSend(t, args, SendRemote)
+	})
+	t.Register("send_error", func(t *tcl.Tcl, args []string) int {
+		return cmdSend(t, args, SendError)
+	})
+	t.Register("send_log", func(t *tcl.Tcl, args []string) int {
+		return cmdSend(t, args, SendLog)
+	})
+	t.Register("send_user", func(t *tcl.Tcl, args []string) int {
+		return cmdSend(t, args, SendUser)
+	})
+	t.Register("sleep", cmdSleep)
+	t.Register("spawn", cmdSpawn)
+	t.Register("wait", cmdWait)
+	t.SetVarValue("timeout", "-1")
 
-	data := expectData{}
-	tcl.Data["expect"] = &data
+	data := expectData{matchMax: 2000, logUser: true}
+	t.Data["expect"] = &data
 	data.processes = make(map[string]*expectProcess)
 }
 
@@ -157,8 +153,7 @@ outer:
 	var patterns []string
 	// Build match patterns.
 	if (i + 1) == len(args) {
-		//	fmt.Printf("match: %d %d\n", i, len(args))
-		patterns = tcl.NewTCL().ParseArgs(args[i])
+		patterns = t.ParseArgs(args[i])
 	} else {
 		patterns = args[i:]
 	}
@@ -173,7 +168,6 @@ outer:
 	ok, timeout := t.GetVarValue("timeout")
 	proc.readTimeOut = -1
 	if ok == tcl.RetOk {
-		fmt.Println(timeout)
 		timeOut, _, ok := tcl.ConvertStringToNumber(timeout, 10, 0)
 		if !ok {
 			return t.SetResult(tcl.RetError, "timeout variable not defined.")
@@ -185,7 +179,7 @@ outer:
 
 	// Process any unprocessed input.
 	if len(proc.last) != 0 {
-		ret, _ := processRemote(proc, proc.last, nil)
+		ret := processRemote(proc, proc.last, nil)
 		proc.last = []byte{}
 		switch ret {
 		case ExpEnd:
@@ -195,17 +189,15 @@ outer:
 		}
 	}
 
-	fmt.Println("Expect")
 	// Start reading input.
+	proc.rdr.setLogging(expect.logFile, expect.logUser, expect.logAll)
 	proc.rdr.startReader(nil)
 	defer proc.rdr.stopReader()
 expect:
 	for {
 		ret := proc.rdr.wait()
-		fmt.Printf("wait %d\n", ret)
 		switch ret {
 		case -1, ExpContinue:
-			//		proc.rdr.startReader(nil)
 		case ExpEnd, tcl.RetExit:
 			break expect
 		case tcl.RetError, tcl.RetBreak, tcl.RetReturn, tcl.RetContinue, tcl.RetOk:
@@ -272,18 +264,18 @@ outer:
 	proc.stdinTimeOut = getTimeout(mlin)
 	proc.readTimeOut = getTimeout(mlout)
 	defer func() { proc.matching = false }()
-	mbuf := matchBuffer{Length: -1, Max: 2000}
+	mbuf := matchBuffer{Length: -1, Max: expect.matchMax}
 
 	if len(proc.last) != 0 {
-		_, _ = processRemote(proc, proc.last, nil)
+		_ = processRemote(proc, proc.last, nil)
 		proc.last = []byte{}
 	}
 
+	proc.rdr.setLogging(expect.logFile, false, false)
 	proc.rdr.startReader(os.Stdin)
 	defer proc.rdr.stopReader()
 	for {
 		ret := proc.rdr.read(t, proc, mlin, &mbuf)
-		fmt.Printf("Read %d\n", ret)
 		if ret >= 0 {
 			switch ret {
 			case ExpEnd, tcl.RetExit:
@@ -295,16 +287,17 @@ outer:
 			}
 			continue
 		}
-
 	}
 }
 
 // Send string to output.
-func cmdSend(t *tcl.Tcl, args []string) int {
+func cmdSend(t *tcl.Tcl, args []string, dest int) int {
 	spawnID := ""
 	sendNull := false
 	numNull := 0
 	sendBreak := false
+	chunk := 0
+	timeout := 0
 	i := 1
 outer:
 	for ; i < len(args); i++ {
@@ -334,30 +327,49 @@ outer:
 			sendBreak = true
 
 		case "-h":
+			ret, val := t.GetVarValue("send_human")
+			if ret == tcl.RetOk {
+				times := scanSend(val)
+				if len(times) > 0 {
+					chunk = times[0] / 1000
+				}
+				if len(times) > 1 {
+					timeout = times[1]
+				}
+			}
 
 		case "-s":
+			ret, val := t.GetVarValue("send_slow")
+			if ret == tcl.RetOk {
+				times := scanSend(val)
+				if len(times) > 0 {
+					chunk = times[0] / 1000
+				}
+				if len(times) > 1 {
+					timeout = times[1]
+				}
+			}
 
 		default:
 			break outer
 		}
 	}
 
-	var send []byte
+	var send string
 	switch {
 	case sendNull:
-		send = make([]byte, numNull)
+		send = strings.Repeat("\000", numNull)
 	case sendBreak:
-		send = []byte{tnBRK}
+		send = string(tnBRK)
 	case i >= len(args):
 		return t.SetResult(tcl.RetError, "send string")
 	default:
-		send = []byte(args[i])
+		send = args[i]
 	}
 
 	if spawnID == "" {
 		ok, id := t.GetVarValue("spawn_id")
 		if ok != tcl.RetOk || id == "" {
-			fmt.Println(send)
 			return t.SetResult(tcl.RetOk, "")
 		}
 		spawnID = id
@@ -373,11 +385,97 @@ outer:
 		return t.SetResult(tcl.RetError, "no process of name "+spawnID)
 	}
 
-	err := proc.rdr.write(proc, send)
-	if err != nil {
-		return t.SetResult(tcl.RetError, err.Error())
+	chunks := chunkString(send, chunk)
+
+	for _, sendString := range chunks {
+		var err error
+		switch dest {
+		case SendRemote:
+			err = proc.rdr.write(proc, []byte(sendString))
+		case SendError:
+			_, err = os.Stderr.Write([]byte(sendString))
+		case SendLog:
+			if expect.logFile != nil {
+				_, err = expect.logFile.Write([]byte(sendString))
+			}
+		case SendUser:
+			_, err = os.Stdout.Write([]byte(sendString))
+		}
+		if err != nil {
+			return t.SetResult(tcl.RetError, err.Error())
+		}
+		if timeout != 0 {
+			time.Sleep(time.Millisecond * time.Duration(timeout))
+		}
 	}
 	return t.SetResult(tcl.RetOk, "")
+}
+
+// Scan variable and return times in milliseconds.
+func scanSend(str string) []int {
+	results := []int{}
+	val := 0
+	haveNum := false
+	scale := 1000 // How much to scale number by.
+	dot := false
+	for _, d := range str {
+		// Skip leading spaces.
+		if unicode.IsSpace(d) {
+			// On space if we have value,
+			if haveNum {
+				results = append(results, val*scale)
+				val = 0
+				haveNum = false
+				scale = 1000
+			}
+			continue
+		}
+
+		// If we have . start scaling.
+		if d == '.' {
+			dot = true
+			continue
+		}
+
+		// If not digit, exit.
+		if d < '0' || d > '9' {
+			break
+		}
+		val = (val * 10) + int(d-'0')
+		haveNum = true
+		if dot {
+			scale /= 10
+		}
+	}
+
+	// Make sure any trailing number is inserted.
+	if haveNum {
+		results = append(results, val*scale)
+	}
+	return results
+}
+
+// Chunk string into a series of character to send at a time.
+func chunkString(str string, chunk int) []string {
+	if len(str) == 0 {
+		return []string{}
+	}
+	if chunk == 0 || chunk >= len(str) {
+		return []string{str}
+	}
+	ret := []string{}
+	length := 0
+	start := 0
+	for i := range str {
+		if length == chunk {
+			ret = append(ret, str[start:i])
+			length = 0
+			start = i
+		}
+		length++
+	}
+	ret = append(ret, str[start:])
+	return ret
 }
 
 // Connect to TCP host.
@@ -425,7 +523,7 @@ func cmdSpawn(t *tcl.Tcl, args []string) int {
 	spawnID := "spawn" + tcl.ConvertNumberToString(expect.spawnCount, 10)
 	t.SetVarValue("spawn_id", spawnID)
 	expect.spawnCount++
-	proc := expectProcess{tcl: t, last: []byte{}, matchData: matchBuffer{Length: -1, Max: 2000}}
+	proc := expectProcess{tcl: t, last: []byte{}, matchData: matchBuffer{Length: -1, Max: expect.matchMax}}
 	expect.processes[spawnID] = &proc
 	cmd := exec.Command(args[1], args[2:]...)
 	proc.command = cmd
@@ -563,4 +661,141 @@ outer:
 	}
 
 	return t.SetResult(tcl.RetOk, "")
+}
+
+// Set log file.
+func cmdLogFile(t *tcl.Tcl, args []string) int {
+	name := ""
+	mode := os.O_WRONLY | os.O_TRUNC | os.O_CREATE
+	perm := 0o666
+	all := false
+	expect, eok := t.Data["expect"].(*expectData)
+	if !eok {
+		panic("invalid data type expect extension")
+	}
+
+	// Process arguments.
+	i := 1
+outer:
+	for ; i < len(args); i++ {
+		switch args[i] {
+		case "-noappend":
+			mode = os.O_WRONLY | os.O_APPEND | os.O_CREATE
+
+		case "-a":
+			all = true
+
+		case "-info":
+			res := ""
+			if expect.logFile != nil {
+				if expect.logAll {
+					res += "-a "
+				}
+				res += expect.logFile.Name()
+			}
+			return t.SetResult(tcl.RetOk, res)
+
+		default:
+			file, err := os.OpenFile(args[i], mode, os.FileMode(perm))
+			if err != nil {
+				return t.SetResult(tcl.RetError, "unable to open file "+name+" "+err.Error())
+			}
+			expect.logFile = file
+			expect.logAll = all
+			break outer
+		}
+	}
+
+	return t.SetResult(tcl.RetOk, "")
+}
+
+// Set output to user.
+func cmdLogUser(t *tcl.Tcl, args []string) int {
+	if len(args) != 2 {
+		return t.SetResult(tcl.RetError, "log_user -info|0|1")
+	}
+
+	expect, eok := t.Data["expect"].(*expectData)
+	if !eok {
+		panic("invalid data type expect extension")
+	}
+
+	res := ""
+	switch args[1] {
+	case "-info":
+		res = "0"
+		if expect.logUser {
+			res = "1"
+		}
+	case "0":
+		expect.logUser = false
+	case "1":
+		expect.logUser = true
+	default:
+		return t.SetResult(tcl.RetError, "log_user -info|0|1")
+	}
+
+	return t.SetResult(tcl.RetOk, res)
+}
+
+// Set match Max number.
+func cmdMatchMax(t *tcl.Tcl, args []string) int {
+	// Scan arguments.
+	global := false
+	spawnID := ""
+	i := 1
+	max := -1
+outer:
+	for ; i < len(args); i++ {
+		switch args[i] {
+		case "-d":
+			global = true
+		case "-i":
+			i++
+			if i >= len(args) {
+				return t.SetResult(tcl.RetError, "-i missing argument")
+			}
+			spawnID = args[i]
+		default:
+			break outer
+		}
+	}
+
+	if i < len(args) {
+		m, _, ok := tcl.ConvertStringToNumber(args[i], 10, 0)
+		if !ok || m < 0 {
+			return t.SetResult(tcl.RetError, "match_max not numeric argument")
+		}
+		max = m
+	}
+
+	// Get process to close.
+	if spawnID == "" {
+		ok, id := t.GetVarValue("spawn_id")
+		if ok == tcl.RetOk {
+			spawnID = id
+		}
+	}
+
+	expect, eok := t.Data["expect"].(*expectData)
+	if !eok {
+		panic("invalid data type expect extension")
+	}
+
+	if spawnID == "" || global {
+		if global && max >= 0 {
+			expect.matchMax = max
+		}
+		return t.SetResult(tcl.RetOk, tcl.ConvertNumberToString(expect.matchMax, 10))
+	}
+
+	proc, sok := expect.processes[spawnID]
+	if !sok {
+		return t.SetResult(tcl.RetError, "no process of name "+spawnID)
+	}
+
+	if max >= 0 {
+		proc.matchData.Max = max
+	}
+	return t.SetResult(tcl.RetOk, tcl.ConvertNumberToString(proc.matchData.Max, 10))
 }

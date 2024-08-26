@@ -26,7 +26,6 @@
 package expect
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -54,9 +53,12 @@ type streamReader struct {
 	stdinTimer    *time.Timer               // Timer for stdin timeout.
 	readTimer     *time.Timer               // Timer for remote timeout.
 	exitChan      chan int                  // Signal matched for remote input.
+	logFile       *os.File                  // File to log remote traffic too.
+	logUser       bool                      // Log to user.
+	logAll        bool                      // Always log to user.
 }
 
-// func newReader(in *os.File, out io.Reader, fn func([]byte, error) bool) *streamReader {
+// Create a new remote reader.
 func newReader(proc *expectProcess) *streamReader {
 	r := &streamReader{
 		proc:      proc,
@@ -66,9 +68,15 @@ func newReader(proc *expectProcess) *streamReader {
 	return r
 }
 
+// Set logging on change.
+func (r *streamReader) setLogging(logFile *os.File, logUser bool, logAll bool) {
+	r.logFile = logFile
+	r.logAll = logAll
+	r.logUser = logUser
+}
+
 // Set up to start reading from remote and stdin if specified.
 func (r *streamReader) startReader(in *os.File) {
-	fmt.Println("startReader")
 	// Start timeout for remote connection.
 	if r.proc.readTimeOut > 0 {
 		r.readTimer = time.NewTimer(time.Second * time.Duration(r.proc.readTimeOut))
@@ -77,9 +85,9 @@ func (r *streamReader) startReader(in *os.File) {
 		r.readTimer.Stop()
 	}
 
+	r.done = false
 	// If remote reader not running, start it.
 	if !r.running {
-		r.done = false
 		if r.proc.pty != nil {
 			r.rdr, _ = cancelreader.NewReader(r.proc.pty)
 		} else {
@@ -110,10 +118,11 @@ func (r *streamReader) startReader(in *os.File) {
 
 // Close done reader.
 func (r *streamReader) stopReader() {
-	fmt.Printf("stopReader")
 	r.done = true
 	r.rdr.Cancel()
-	r.readTimer.Stop()
+	if !r.readTimer.Stop() {
+		<-r.readTimer.C
+	}
 	if r.inFile == nil {
 		return
 	}
@@ -134,7 +143,6 @@ func (r *streamReader) stopReader() {
 		}
 		return
 	case <-time.After(time.Second):
-		fmt.Println("Reader timeout")
 		return
 	}
 }
@@ -159,7 +167,6 @@ func (r *streamReader) read(t *tcl.Tcl, proc *expectProcess, mlin []*matchList, 
 		select {
 		// Wait for character from stdin, if found process it and request new one.
 		case data := <-r.stdinChan:
-			fmt.Println("stdin read: " + string(data.data))
 			appendMatch(mlin, mbuf, data.data)
 			ret, m := match(t, mlin, mbuf)
 			switch ret {
@@ -182,16 +189,13 @@ func (r *streamReader) read(t *tcl.Tcl, proc *expectProcess, mlin []*matchList, 
 
 		// Handle timeout.
 		case <-r.stdinTimer.C:
-			fmt.Println("Stdin timeout")
 			return matchSpecial(proc.tcl, mlin, "timeout")
 
 		case <-r.readTimer.C:
-			fmt.Println("Read timeout")
 			return matchSpecial(proc.tcl, proc.matchPats, "timeout")
 
 		// Remote input matched something.
 		case ret := <-r.exitChan:
-			fmt.Println("Exit")
 			return ret
 		}
 	}
@@ -201,11 +205,9 @@ func (r *streamReader) read(t *tcl.Tcl, proc *expectProcess, mlin []*matchList, 
 func (r *streamReader) wait() int {
 	select {
 	case ret := <-r.exitChan:
-		fmt.Println("Exit")
 		return ret
 
 	case <-r.readTimer.C:
-		fmt.Println("wait timeout")
 		return matchSpecial(r.proc.tcl, r.proc.matchPats, "timeout")
 	}
 }
@@ -241,10 +243,8 @@ func (r *streamReader) reader() {
 		if n == 0 {
 			continue
 		}
-		fmt.Printf("stdin %02x '%s'\n", input[0], string(input))
 		r.stdinChan <- readData{data: input[:n], err: nil}
 	}
-	fmt.Println("input done")
 }
 
 // Read input from remote host or pty. Process each input.
@@ -254,7 +254,6 @@ func (r *streamReader) outReader() {
 	var err error
 	r.done = false
 	r.running = true
-	fmt.Println("Reader started")
 	for !r.done {
 		input := make([]byte, 1024)
 		// Get data. Any error is considered end of file.
@@ -274,16 +273,22 @@ func (r *streamReader) outReader() {
 			break
 		}
 
-		fmt.Printf("outReader: '%s' %d %s\n", string(input), n, err)
+		if r.logFile != nil {
+			_, _ = r.logFile.Write(input[:n])
+		}
+
+		if r.logUser || r.logAll {
+			_, _ = os.Stdout.Write(input[:n])
+		}
+
 		if n == 0 && err == nil {
 			continue
 		}
 
-		ret, _ := processRemote(r.proc, input[:n], err)
+		ret := processRemote(r.proc, input[:n], err)
 		if ret >= 0 {
 			r.exitChan <- ret
 			break
 		}
 	}
-	fmt.Println("Reader exit")
 }

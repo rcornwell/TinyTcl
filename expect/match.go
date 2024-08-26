@@ -27,7 +27,6 @@ package expect
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -59,11 +58,11 @@ type matchList struct {
 func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 	mlin := []*matchList{}
 	mlout := []*matchList{}
-	match := &matchList{}
+	match := &matchList{glob: true}
 	timeout := false
 	output := !input
 	body := false
-	fmt.Println(patterns)
+	flag := false
 	for _, v := range patterns {
 		// For interact, timeout can have optional timeout value.
 		if input && timeout {
@@ -78,13 +77,14 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 		// If got pattern, next should be body.
 		if body {
 			match.body = v
-			match = &matchList{}
+			match = &matchList{glob: true}
 			body = false
+			flag = false
 			continue
 		}
 
 		// Not body, see if minus option.
-		if !match.exact {
+		if !flag {
 			switch v {
 			case "-o":
 				if !output {
@@ -94,10 +94,13 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 
 			case "-ex":
 				match.exact = true
+				match.glob = false
+				flag = true
 				continue
 
 			case "-gl":
 				match.glob = true
+				flag = true
 				continue
 
 			case "-echo":
@@ -149,14 +152,12 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 func appendMatch(ml []*matchList, mbuf *matchBuffer, by []byte) {
 	mbuf.matchBuffer += string(by)
 	mbuf.Length += len(by)
-	fmt.Printf("append '%s' %d %d\n", string(by), mbuf.Max, mbuf.Length)
 	if mbuf.Length < mbuf.Max {
 		return
 	}
 
 	// Back up match pointers.
 	shift := mbuf.Length - mbuf.Max
-	fmt.Printf("Shift buffer '%s' %d %d %d\n", string(mbuf.matchBuffer), mbuf.Max, mbuf.Length, shift)
 	mbuf.matchBuffer = mbuf.matchBuffer[shift:]
 	mbuf.Length = len(mbuf.matchBuffer)
 	for i := range len(ml) {
@@ -187,26 +188,33 @@ func match(t *tcl.Tcl, ml []*matchList, mbuf *matchBuffer) (int, bool) {
 		for i := range ml {
 			// If this is command, or match position past end of buffer,
 			// skip this pattern.
-			if ml[i].cmd || ml[i].mpos > mbuf.Length {
-				fmt.Printf("Skip %d %d %d\n", ml[i].mpos, mbuf.Length, i)
+			if ml[i].cmd || ml[i].mpos > mbuf.Length || mbuf.Length == 0 {
+				continue
+			}
+			if ml[i].glob {
+				for j := range mbuf.Length - 1 {
+					mstr := mbuf.matchBuffer[j:]
+					r := tcl.Match(ml[i].str, mstr, ml[i].nocase, len(mstr))
+					if r > 0 {
+						moveBuffer(ml, mbuf, j+r)
+						if ml[i].body == "" {
+							return ExpEnd, true
+						}
+						return t.Eval(ml[i].body), true
+					}
+				}
 				continue
 			}
 			did = true
-			// if ml[i].glob {
-			// 	mstr := mbuf.matchBuffer[ml[i].mpos:]
-			// 	r := tcl.Match(ml[i].str, mstr, ml[i].nocase, len(mstr))
-			// }
 			by := mbuf.matchBuffer[ml[i].mpos]
 			if ml[i].nocase {
-				by = byte(strings.ToLower(string(by))[0])
+				by = strings.ToLower(string(by))[0]
 			}
 			ml[i].mpos++
 			match := ml[i].str[ml[i].bpos]
-			fmt.Printf("check %d %d %d %d %02x %02x\n", ml[i].mpos, ml[i].bpos, mbuf.Length, i, by, match)
 			if match == by {
 				ml[i].bpos++
 				if ml[i].bpos == len(ml[i].str) {
-					//		fmt.Println("Match " + ml[i].str)
 					moveBuffer(ml, mbuf, ml[i].mpos)
 					if ml[i].body == "" {
 						return ExpEnd, true
@@ -227,7 +235,6 @@ func match(t *tcl.Tcl, ml []*matchList, mbuf *matchBuffer) (int, bool) {
 
 // Match special patterns.
 func matchSpecial(t *tcl.Tcl, ml []*matchList, str string) int {
-	fmt.Println("Special " + str)
 	for i := range ml {
 		if ml[i].cmd {
 			if ml[i].str == str || ml[i].str == "default" {
@@ -253,21 +260,21 @@ func getTimeout(ml []*matchList) int {
 }
 
 // Process input from remote system.
-func processRemote(proc *expectProcess, input []byte, err error) (int, bool) {
+func processRemote(proc *expectProcess, input []byte, err error) int {
 	if errors.Is(err, io.EOF) {
-		return matchSpecial(proc.tcl, proc.matchPats, "eof"), true
+		return matchSpecial(proc.tcl, proc.matchPats, "eof")
 	}
 
 	if err != nil {
-		return tcl.RetError, false
+		return tcl.RetError
 	}
 
 	if proc.matching {
 		appendMatch(proc.matchPats, &proc.matchData, input)
 		r, _ := match(proc.tcl, proc.matchPats, &proc.matchData)
-		return r, false
+		return r
 	}
 
 	proc.last = append(proc.last, input...)
-	return tcl.RetOk, false
+	return tcl.RetOk
 }
