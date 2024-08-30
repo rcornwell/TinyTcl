@@ -72,7 +72,7 @@ func (tcl *Tcl) tclInitCommands() {
 	tcl.Register("string", cmdString)
 	tcl.Register("subst", cmdSubst)
 	tcl.Register("switch", cmdSwitch)
-	// tcl.Register("uplevel", cmdUpLevel)
+	tcl.Register("uplevel", cmdUpLevel)
 	tcl.Register("upvar", cmdUpVar)
 	tcl.Register("unset", cmdUnSet)
 	tcl.Register("variable", cmdVariable)
@@ -229,7 +229,7 @@ func cmdUpVar(tcl *Tcl, args []string) int {
 		return tcl.SetResult(RetError, "not valid level number")
 	}
 
-	// Get a variable at a envirorment.
+	// Get a variable at a environment.
 	for (v + 1) < len(args) {
 		variable, ok := env.vars[args[v]]
 		if ok {
@@ -239,6 +239,62 @@ func cmdUpVar(tcl *Tcl, args []string) int {
 		v += 2
 	}
 	return tcl.SetResult(RetOk, "")
+}
+
+// Create link to variable in current environment.
+func cmdUpLevel(tcl *Tcl, args []string) int {
+	if len(args) < 2 {
+		return tcl.SetResult(RetError, "uplevel ?level arg ?arg")
+	}
+	v := 1
+	level := 1
+	top := false
+	cmd := 1
+
+	if len(args) > 2 {
+		v++
+		lvlNum := args[1]
+		pos := 0
+		if lvlNum[0] == '#' {
+			top = true
+			pos = 1
+		}
+		lvl, _, ok := ConvertStringToNumber(lvlNum, 10, pos)
+		if top && !ok {
+			return tcl.SetResult(RetError, "not valid level number")
+		}
+		if ok {
+			cmd++
+			level = lvl
+		}
+	}
+
+	// Must have at least one argument
+	if len(args) < cmd {
+		return tcl.SetResult(RetError, "uplevel ?level arg ?arg")
+	}
+
+	str := strings.Join(args[cmd:], " ")
+
+	env := tcl.getLevel(top, level)
+	if env == nil {
+		return tcl.SetResult(RetError, "not valid level number")
+	}
+
+	// Save the current environment
+	saveEnv := tcl.env
+	saveLevel := tcl.level
+	tcl.env = env // Set environment to level.
+	tcl.level = env.level
+
+	// Execute at level
+	ret := tcl.eval(str, parserOptions{})
+
+	// Restore symbol table and level.
+	tcl.env = saveEnv
+	tcl.level = saveLevel
+
+	return ret
 }
 
 // Link to global variables in top level.
