@@ -36,7 +36,7 @@ import (
 	tcl "github.com/rcornwell/tinyTCL/tcl"
 )
 
-var funmap = map[string]func(*tcl.Tcl, []string) int{
+var funcMap = map[string]func(*tcl.Tcl, []string) int{
 	"atime":       fileType,      // name
 	"channels":    fileChannels,  // ?pattern
 	"copy":        fileCopy,      //  -force -- source target
@@ -83,7 +83,7 @@ func cmdFile(t *tcl.Tcl, args []string) int {
 	if len(args) < 2 {
 		return t.SetResult(tcl.RetError, "file function")
 	}
-	fn, ok := funmap[args[1]]
+	fn, ok := funcMap[args[1]]
 	if !ok {
 		return t.SetResult(tcl.RetError, "file unknown function")
 	}

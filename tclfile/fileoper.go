@@ -169,10 +169,10 @@ func cmdRead(t *tcl.Tcl, args []string) int {
 		panic("invalid data type file extension")
 	}
 
-	nonewline := false
+	noNewline := false
 	i := 1
 	if args[i] == "-nonewline" {
-		nonewline = true
+		noNewline = true
 		i++
 	}
 
@@ -214,7 +214,7 @@ func cmdRead(t *tcl.Tcl, args []string) int {
 		return t.SetResult(tcl.RetOk, "")
 	}
 
-	if nonewline && buffer[n-1] == '\n' {
+	if noNewline && buffer[n-1] == '\n' {
 		n--
 	}
 	return t.SetResult(tcl.RetOk, string(buffer[:n]))
@@ -275,11 +275,11 @@ func cmdPuts(t *tcl.Tcl, args []string) int {
 		panic("invalid data type file extension")
 	}
 
-	nonewline := false
+	noNewline := false
 	file := files.channels["stdout"]
 	i := 1
 	if args[i] == "-nonewline" {
-		nonewline = true
+		noNewline = true
 		i++
 	}
 
@@ -293,7 +293,7 @@ func cmdPuts(t *tcl.Tcl, args []string) int {
 	}
 
 	text := args[i]
-	if !nonewline {
+	if !noNewline {
 		text += "\n"
 	}
 

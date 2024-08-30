@@ -216,7 +216,7 @@ func cmdLReplace(tcl *Tcl, args []string) int {
 	}
 	last, _, lok := convertListIndex(args[3], len(list), 0)
 	if !lok {
-		return tcl.SetResult(RetError, "lreplce second index invalid")
+		return tcl.SetResult(RetError, "lreplace second index invalid")
 	}
 
 	first = max(min(first, len(list)), 0)
@@ -330,13 +330,14 @@ func cmdLSearch(tcl *Tcl, args []string) int {
 	op := opGlob
 	all := false
 	inline := false
-	nocase := false
+	ignoreCase := false
 	not := false
 	start := 0
 	sort := false
 
 	i := 1
 outer:
+	// Scan arguments for flags.
 	for ; i < len(args); i++ {
 		switch args[i] {
 		case "-integer":
@@ -351,8 +352,8 @@ outer:
 			all = true
 		case "-not":
 			not = true
-		case "-nocasa":
-			nocase = true
+		case "-nocase":
+			ignoreCase = true
 		case "-inline":
 			inline = true
 		case "-sorted":
@@ -371,34 +372,42 @@ outer:
 			break outer
 		}
 	}
+
+	// Need search arguments.
 	if (i + 1) >= len(args) {
 		return tcl.SetResult(RetError, "lsearch ?options list pattern")
 	}
+
+	// Convert search list array of strings.
 	list := tcl.ParseArgs(args[i])
 	pattern := args[i+1]
-	imatch := 0
+
+	// If pattern is integer convert.
+	matchValue := 0
 	if op == opInteger {
 		m, _, ok := ConvertStringToNumber(args[i+1], 10, 0)
 		if !ok {
 			return tcl.SetResult(RetError, "pattern not a number")
 		}
-		imatch = m
+		matchValue = m
 	}
 	result := []string{}
+
 matchLoop:
+	// Scan list for values.
 	for i := start; i < len(list); i++ {
 		value := list[i]
 		match := false
 		switch op {
 		case opGlob:
-			m := Match(pattern, value, nocase, len(value))
+			m := Match(pattern, value, ignoreCase, len(value))
 			if m < 0 {
 				return tcl.SetResult(RetError, "Nesting level exceeded")
 			}
 			match = m != 0
 
 		case opExact:
-			if nocase {
+			if ignoreCase {
 				match = strings.EqualFold(pattern, value)
 			} else {
 				match = pattern == value
@@ -416,7 +425,7 @@ matchLoop:
 			if !ok {
 				return tcl.SetResult(RetError, "Not a number")
 			}
-			match = imatch == v
+			match = matchValue == v
 		}
 
 		// Evaluate match.

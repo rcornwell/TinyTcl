@@ -73,6 +73,7 @@ type tclEnv struct {
 	local  map[string]bool    // Is this name local to procedure
 	parent *tclEnv            // Parent nesting level.
 	args   string             // Current arguments.
+	level  int                // Level of this environment.
 }
 
 // Create new environment to execute TCl commands.
@@ -142,32 +143,28 @@ func (tcl *Tcl) eval(str string, opts parserOptions) int {
 
 		switch p.token {
 		case tokVar: // If variable, replace with value.
-			ok, result := tcl.GetVarValue(val)
-			if ok != RetOk {
+			ret, result := tcl.GetVarValue(val)
+			if ret != RetOk {
 				tcl.result = result
 				return RetError
 			}
-			if len(result) == 0 {
-				val = ""
-			} else {
-				val = result
-			}
+			val = result
 
 		case tokCmd: // Got command, try and execute it.
-			err := tcl.eval(val, parserOptions{})
-			if err != RetOk {
+			ret := tcl.eval(val, parserOptions{})
+			if ret != RetOk {
 				if p.options.noEval {
-					if err == RetBreak {
+					if ret == RetBreak {
 						tcl.result = strings.Join(args, " ")
 						return RetOk
 					}
 
-					if err == RetContinue || err == RetReturn {
+					if ret == RetContinue || ret == RetReturn {
 						val = tcl.result
 						break
 					}
 				}
-				return err
+				return ret
 			}
 			val = tcl.result
 

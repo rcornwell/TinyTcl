@@ -606,8 +606,8 @@ outer:
 	if cmd != nil {
 		err := cmd.Wait()
 		if err != nil {
-			code, ok := err.(*exec.ExitError)
-			if ok {
+			code, isExitError := err.(*exec.ExitError)
+			if isExitError {
 				return t.SetResult(tcl.RetOk, tcl.ConvertNumberToString(code.ExitCode(), 10))
 			}
 		}

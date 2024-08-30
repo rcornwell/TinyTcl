@@ -42,16 +42,16 @@ type matchBuffer struct {
 
 // Match parameters.
 type matchList struct {
-	str      string // String to match against.
-	mpos     int    // Position in match string.
-	bpos     int    // Position in match buffer.
-	exact    bool   // Exact match requested.
-	glob     bool   // Glob expression.
-	cmd      bool   // String is not a pattern.
-	body     string // Match execution.
-	nocase   bool   // Ignore case on match.
-	echo     bool   // Echo matches out.
-	nobuffer bool   // Don't buffer matches for this pattern.
+	pattern    string // String to match against.
+	matchPos   int    // Position in match string.
+	bufferPos  int    // Position in match buffer.
+	exact      bool   // Exact match requested.
+	glob       bool   // Glob expression.
+	cmd        bool   // String is not a pattern.
+	body       string // Match execution.
+	ignoreCase bool   // Ignore case on match.
+	echo       bool   // Echo matches out.
+	nobuffer   bool   // Don't buffer matches for this pattern.
 }
 
 // Scan match list and generate list of match patterns.
@@ -68,7 +68,7 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 		if input && timeout {
 			t, _, ok := tcl.ConvertStringToNumber(v, 10, 0)
 			if ok {
-				match.bpos = t
+				match.bufferPos = t
 				timeout = false
 				continue
 			}
@@ -112,7 +112,7 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 				continue
 
 			case "-nocase":
-				match.nocase = true
+				match.ignoreCase = true
 				continue
 
 			default:
@@ -133,10 +133,10 @@ func scanMatch(patterns []string, input bool) ([]*matchList, []*matchList) {
 		}
 
 		// Put new pattern into correct list.
-		if match.nocase {
+		if match.ignoreCase {
 			v = strings.ToLower(v)
 		}
-		match.str = v
+		match.pattern = v
 		if output {
 			mlout = append(mlout, match)
 		} else {
@@ -161,8 +161,8 @@ func appendMatch(ml []*matchList, mbuf *matchBuffer, by []byte) {
 	mbuf.matchBuffer = mbuf.matchBuffer[shift:]
 	mbuf.Length = len(mbuf.matchBuffer)
 	for i := range len(ml) {
-		ml[i].bpos = max(0, ml[i].bpos-shift)
-		ml[i].mpos = max(0, ml[i].mpos-shift)
+		ml[i].bufferPos = max(0, ml[i].bufferPos-shift)
+		ml[i].matchPos = max(0, ml[i].matchPos-shift)
 	}
 }
 
@@ -171,8 +171,8 @@ func moveBuffer(ml []*matchList, mbuf *matchBuffer, pos int) {
 	mbuf.matchBuffer = mbuf.matchBuffer[pos:]
 	mbuf.Length = len(mbuf.matchBuffer)
 	for j := range len(ml) {
-		ml[j].bpos = 0
-		ml[j].mpos = 0
+		ml[j].bufferPos = 0
+		ml[j].matchPos = 0
 	}
 }
 
@@ -188,13 +188,15 @@ func match(t *tcl.Tcl, ml []*matchList, mbuf *matchBuffer) (int, bool) {
 		for i := range ml {
 			// If this is command, or match position past end of buffer,
 			// skip this pattern.
-			if ml[i].cmd || ml[i].mpos > mbuf.Length || mbuf.Length == 0 {
+			if ml[i].cmd || ml[i].matchPos > mbuf.Length || mbuf.Length == 0 {
 				continue
 			}
+
+			// If glob match, scan full string to see if pattern in it.
 			if ml[i].glob {
 				for j := range mbuf.Length - 1 {
-					mstr := mbuf.matchBuffer[j:]
-					r := tcl.Match(ml[i].str, mstr, ml[i].nocase, len(mstr))
+					matchString := mbuf.matchBuffer[j:]
+					r := tcl.Match(ml[i].pattern, matchString, ml[i].ignoreCase, len(matchString))
 					if r > 0 {
 						moveBuffer(ml, mbuf, j+r)
 						if ml[i].body == "" {
@@ -206,16 +208,16 @@ func match(t *tcl.Tcl, ml []*matchList, mbuf *matchBuffer) (int, bool) {
 				continue
 			}
 			did = true
-			by := mbuf.matchBuffer[ml[i].mpos]
-			if ml[i].nocase {
+			by := mbuf.matchBuffer[ml[i].matchPos]
+			if ml[i].ignoreCase {
 				by = strings.ToLower(string(by))[0]
 			}
-			ml[i].mpos++
-			match := ml[i].str[ml[i].bpos]
+			ml[i].matchPos++
+			match := ml[i].pattern[ml[i].bufferPos]
 			if match == by {
-				ml[i].bpos++
-				if ml[i].bpos == len(ml[i].str) {
-					moveBuffer(ml, mbuf, ml[i].mpos)
+				ml[i].bufferPos++
+				if ml[i].bufferPos == len(ml[i].pattern) {
+					moveBuffer(ml, mbuf, ml[i].matchPos)
 					if ml[i].body == "" {
 						return ExpEnd, true
 					}
@@ -226,7 +228,7 @@ func match(t *tcl.Tcl, ml []*matchList, mbuf *matchBuffer) (int, bool) {
 				}
 				m = true
 			} else {
-				ml[i].bpos = 0
+				ml[i].bufferPos = 0
 			}
 		}
 	}
@@ -237,7 +239,7 @@ func match(t *tcl.Tcl, ml []*matchList, mbuf *matchBuffer) (int, bool) {
 func matchSpecial(t *tcl.Tcl, ml []*matchList, str string) int {
 	for i := range ml {
 		if ml[i].cmd {
-			if ml[i].str == str || ml[i].str == "default" {
+			if ml[i].pattern == str || ml[i].pattern == "default" {
 				if ml[i].body != "" {
 					return t.Eval(ml[i].body)
 				}
@@ -252,8 +254,8 @@ func matchSpecial(t *tcl.Tcl, ml []*matchList, str string) int {
 // Find any timeout values in match list.
 func getTimeout(ml []*matchList) int {
 	for i := range ml {
-		if ml[i].cmd && ml[i].str == "timeout" {
-			return ml[i].bpos
+		if ml[i].cmd && ml[i].pattern == "timeout" {
+			return ml[i].bufferPos
 		}
 	}
 	return -1

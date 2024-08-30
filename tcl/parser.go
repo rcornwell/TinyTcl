@@ -182,18 +182,18 @@ func (p *parser) parseEOL() bool {
 func (p *parser) parseCommand() bool {
 	p.next()
 	p.start = p.pos
-	blevel := 0
+	braceLevel := 0
 	level := 1
 outer:
 	for p.char != 0 {
 		switch p.char {
 		case '[':
-			if blevel == 0 {
+			if braceLevel == 0 {
 				level++
 			}
 
 		case ']':
-			if blevel == 0 {
+			if braceLevel == 0 {
 				level--
 				if level == 0 {
 					break outer
@@ -204,11 +204,11 @@ outer:
 			p.next()
 
 		case '{':
-			blevel++
+			braceLevel++
 
 		case '}':
-			if blevel != 0 {
-				blevel--
+			if braceLevel != 0 {
+				braceLevel--
 			}
 		case 0:
 			break outer
@@ -232,7 +232,7 @@ func (p *parser) isVarChar() bool {
 
 // Collect variable. Start on $.
 func (p *parser) parseVar() bool {
-	spos := p.pos // Save starting position.
+	startPos := p.pos // Save starting position.
 	brace := false
 	p.next()
 
@@ -248,7 +248,7 @@ func (p *parser) parseVar() bool {
 	p.end = p.pos
 
 	if p.start == p.end { // $ does not have following name.
-		p.start = spos
+		p.start = startPos
 		p.token = tokString
 		return true
 	}

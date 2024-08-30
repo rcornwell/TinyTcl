@@ -30,7 +30,7 @@ import (
 	"unicode"
 )
 
-var funmap = map[string]func(*Tcl, []string) int{
+var funcMap = map[string]func(*Tcl, []string) int{
 	"compare":   stringCompare, // -nocase, -length int, string1, string2
 	"equal":     stringCompare, // -nocase, -length int, string1, string2
 	"first":     stringFind,    // needleString hayStack startIndex
@@ -55,7 +55,7 @@ func cmdString(tcl *Tcl, args []string) int {
 	if len(args) < 2 {
 		return tcl.SetResult(RetError, "string function")
 	}
-	fn, ok := funmap[args[1]]
+	fn, ok := funcMap[args[1]]
 	if !ok {
 		return tcl.SetResult(RetError, "string unknown function")
 	}
@@ -141,7 +141,7 @@ func stringFind(tcl *Tcl, args []string) int {
 	dir := 1
 	maxlen := len(match) - len(str)
 
-	// If startindex set step to position to start.
+	// If start index set step to position to start.
 	if len(args) == 5 {
 		i, _, ok := convertListIndex(args[4], len(str), 0)
 		if !ok {
@@ -516,7 +516,7 @@ func stringToCase(tcl *Tcl, args []string) int {
 	return tcl.SetResult(RetOk, res)
 }
 
-// Trim leading of trailing charcters from a string.
+// Trim leading of trailing characters from a string.
 func stringTrim(tcl *Tcl, args []string) int {
 	match := " \t\n\r"
 	if len(args) > 4 {

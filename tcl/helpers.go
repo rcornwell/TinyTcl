@@ -143,14 +143,14 @@ func UnEscape(str string) (string, int) {
 func ConvertStringToNumber(str string, base int, pos int) (int, int, bool) {
 	result := 0
 	neg := false
-	r := false
-	opos := pos
+	ok := false
+	origPos := pos
 	// Skip leading spaces.
 	for pos < len(str) && unicode.IsSpace(rune(str[pos])) {
 		pos++
 	}
 	if pos >= len(str) {
-		return 0, opos, r
+		return 0, origPos, ok
 	}
 
 	// Check if negative number.
@@ -161,16 +161,16 @@ func ConvertStringToNumber(str string, base int, pos int) (int, int, bool) {
 		pos++
 	}
 	if pos >= len(str) {
-		return 0, opos, r
+		return 0, origPos, ok
 	}
 
 	// Check if hex or octal.
 	if str[pos] == '0' {
-		r = true
+		ok = true
 		base = 8
 		pos++
 		if pos >= len(str) {
-			return 0, pos, r
+			return 0, pos, ok
 		}
 		if str[pos] == 'x' || str[pos] == 'X' {
 			base = 16
@@ -179,7 +179,7 @@ func ConvertStringToNumber(str string, base int, pos int) (int, int, bool) {
 	}
 
 	if pos >= len(str) {
-		return 0, pos, r
+		return 0, pos, ok
 	}
 
 	for pos < len(str) {
@@ -188,16 +188,16 @@ func ConvertStringToNumber(str string, base int, pos int) (int, int, bool) {
 			break
 		}
 		result = (result * base) + d
-		r = true
+		ok = true
 		pos++
 	}
-	if r && neg {
+	if ok && neg {
 		result = -result
 	}
-	if r {
-		return result, pos, r
+	if ok {
+		return result, pos, ok
 	}
-	return result, opos, r
+	return result, origPos, ok
 }
 
 // Convert number back to a string.
@@ -318,8 +318,8 @@ func StringEscape(str string) string {
 	return str
 }
 
-// Match a pattern.
-func Match(pat string, target string, nocase bool, depth int) int {
+// Match a pattern. Return length of match or -1 if no match.
+func Match(pat string, target string, ignoreCase bool, depth int) int {
 	// If at end of string
 	if pat == "" {
 		if target == "" {
@@ -341,7 +341,7 @@ outer:
 	for i < len(pat) {
 		switch pat[i] {
 		case '*': // Match any number of character.
-			r := Match(pat[i+1:], target[k:], nocase, depth-1)
+			r := Match(pat[i+1:], target[k:], ignoreCase, depth-1)
 			if r > 0 {
 				return r
 			}
@@ -383,7 +383,7 @@ outer:
 						last = pat[i]
 					}
 				}
-				if nocase {
+				if ignoreCase {
 					if strings.ToLower(string(target[k])) < strings.ToLower(string(first)) ||
 						strings.ToLower(string(target[k])) > strings.ToLower(string(last)) {
 						return 0
@@ -404,7 +404,7 @@ outer:
 			}
 			fallthrough
 		default:
-			if nocase {
+			if ignoreCase {
 				if !strings.EqualFold(string(pat[i]), string(target[k])) {
 					return 0
 				}
@@ -422,22 +422,22 @@ outer:
 
 // Create new environment, used in user procs.
 func (tcl *Tcl) newEnv() *tclEnv {
-	newenv := &tclEnv{}
-	newenv.vars = make(map[string]*tclVar)
-	newenv.local = make(map[string]bool)
-	return newenv
+	newEnv := &tclEnv{level: tcl.level}
+	newEnv.vars = make(map[string]*tclVar)
+	newEnv.local = make(map[string]bool)
+	return newEnv
 }
 
-// Set variable in new envirorment.
-func (tcl *Tcl) setVarNewEnv(newenv *tclEnv, name string, value string, local bool) {
-	newenv.vars[name] = &tclVar{value: value}
-	newenv.local[name] = local
+// Set variable in new environment.
+func (tcl *Tcl) setVarNewEnv(newEnv *tclEnv, name string, value string, local bool) {
+	newEnv.vars[name] = &tclVar{value: value}
+	newEnv.local[name] = local
 }
 
 // Make new environment current.
-func (tcl *Tcl) pushEnv(newenv *tclEnv) {
-	newenv.parent = tcl.env
-	tcl.env = newenv
+func (tcl *Tcl) pushEnv(newEnv *tclEnv) {
+	newEnv.parent = tcl.env
+	tcl.env = newEnv
 	tcl.level++
 }
 
